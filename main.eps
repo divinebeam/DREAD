@@ -112,6 +112,9 @@ const SOFT_UNIT_MAX = 1000;
 const MAX_ALTARS = 10;
 const MAX_ORBS = MAX_ALTARS * 6;
 const TEXT_RANK_ID = 1314;
+const MAX_MOVEMENT_SPEED = 4000;
+const MAX_SWORD_ATTACK_SPEED = 20;
+const MAX_BOW_ATTACK_SPEED = 24;
 
 const screen = StringBuffer();
 
@@ -1195,9 +1198,16 @@ function SpawnMonstersAtChunk(forChunkX, forChunkY) {
 }
 
 
-function GetAttackSpeed(playerID) {
+function GetSwordAttackSpeed(playerID) {
     var value = p_dexterity[playerID] / 2;
-    if (value > 20) value = 20;
+    if (value > MAX_SWORD_ATTACK_SPEED) value = MAX_SWORD_ATTACK_SPEED;
+    return value;
+}
+
+
+function GetBowAttackSpeed(playerID) {
+    var value = p_dexterity[playerID] / 2;
+    if (value > MAX_BOW_ATTACK_SPEED) value = MAX_BOW_ATTACK_SPEED;
     return value;
 }
 
@@ -1211,7 +1221,7 @@ function GetDashMaxDistance(playerID) {
 
 function GetTopSpeed(playerID) {
     var value = 1200 + (p_agility[playerID] / 5) * 100;
-    if (value > 4000) value = 4000;
+    if (value > MAX_MOVEMENT_SPEED) value = MAX_MOVEMENT_SPEED;
     return value;
 }
 
@@ -1368,6 +1378,22 @@ function UpdateRegenString(playerID) {
 }
 
 
+function UpdateSpeedString(playerID) {
+    if (IsUserCP()) {GetTopSpeed(playerID);
+        const movement_speed_string = Db(512);
+        const movement_speed = Cmn.GetPercentage(GetTopSpeed(playerID), MAX_MOVEMENT_SPEED);
+        sprintf(movement_speed_string, "\x03[A]\x04Movement Speed: \x02{}%", movement_speed);
+        const sword_attack_speed_string = Db(512);
+        const sword_attack_speed = Cmn.GetPercentage(GetSwordAttackSpeed(playerID), MAX_SWORD_ATTACK_SPEED);
+        sprintf(sword_attack_speed_string, "\x07[D]\x04Sword Attack Speed: \x02{}%", sword_attack_speed);
+        const bow_attack_speed_string = Db(512);
+        const bow_attack_speed = Cmn.GetPercentage(GetBowAttackSpeed(playerID), MAX_BOW_ATTACK_SPEED);
+        sprintf(bow_attack_speed_string, "\x07[D]\x04Bow Attack Speed: \x02{}%", bow_attack_speed);
+        settblf(416, 0, "{:s}\n{:s}\n{:s}\n\x0C", movement_speed_string, sword_attack_speed_string, bow_attack_speed_string);
+    }
+}
+
+
 function SpawnPlayer(playerID) {
     p_death_state[playerID] = 101;
     RemoveUnit(U_HERO[playerID], playerID);
@@ -1429,6 +1455,7 @@ function onPluginStart() {
             set_p_lives(p, 2);
             UpdateDamageString(p);
             UpdateRegenString(p);
+            UpdateSpeedString(p);
             for (var i = 0; i < 6; i++) {
                 SetAllianceStatus(i, AlliedVictory);
                 Cmn.GetVision(i);
@@ -1567,7 +1594,7 @@ function afterTriggerExec() {
                 // @bm Sword
                 if (unit_hero.groundWeaponCooldown == 26) {
                     const unit_target = unit_hero.orderTargetUnit;
-                    unit_hero.groundWeaponCooldown -= GetAttackSpeed(playerID);
+                    unit_hero.groundWeaponCooldown -= GetSwordAttackSpeed(playerID);
                     const sword_width = GetSwordWidth(playerID);
                     const sword_length = GetSwordLength(playerID);
                     var dpos_x = unit_target.posX;
@@ -1638,8 +1665,9 @@ function afterTriggerExec() {
                 if (p_bow_state[playerID] > 0) p_bow_state[playerID]++;
                 if (p_bow_state[playerID] >= 13) {
                     p_bow_state[playerID] = 0;
-                    if ((p_dexterity[playerID] / 2) >= 24) p_bow_cooldown[playerID] = 0;
-                    else p_bow_cooldown[playerID] = 24 - (p_dexterity[playerID] / 2);
+                    const speed = GetBowAttackSpeed(playerID);
+                    if (speed >= MAX_BOW_ATTACK_SPEED) p_bow_cooldown[playerID] = 0;
+                    else p_bow_cooldown[playerID] = MAX_BOW_ATTACK_SPEED - speed;
                 }
 
                 // Health regen
@@ -1830,6 +1858,7 @@ function afterTriggerExec() {
                     PlayWAV("staredit\\wav\\increase_attribute.ogg");
                     UpdateDamageString(playerID);
                     UpdateRegenString(playerID);
+                    UpdateSpeedString(playerID);
                     UpdateReviveCost(playerID);
                 }
             } else if (p_menu_main[playerID] == MENU_REVIVE) {
