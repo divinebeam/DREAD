@@ -1,0 +1,2023 @@
+
+import common as Cmn;
+
+const SETTING_SNOW_ENABLED = 1;
+
+const L_UNITBUFFER = $L("unit_buffer");
+const L_ANYWHERE = $L("Anywhere");
+const L_CHECK = $L("check");
+const L_HEIGHT0 = $L("height0");
+const L_HEIGHT1 = $L("height1");
+const L_HEIGHT2 = $L("height2");
+const L_MAIN = $L("main");
+const L_0X0 = $L("0x0");
+const L_1X1 = $L("1x1");
+const L_3X3 = $L("3x3");
+const L_5X5 = $L("5x5");
+const L_10X10 = $L("16x16");
+const L_16X16 = $L("16x16");
+const L_MOUSE = [4, 5, 6, 7, 8, 9];
+
+/*
+    @bm cunit data
+    unknown0x26     orb: altar id
+    unknown0x52     cant seem to write!
+    unknown0x66     orb: update timer
+    unknown0x86     
+    unknown0x8C
+    unknown0x106
+    unusedTimer
+ */
+
+
+const U_ANY = 229;
+const U_MEN = 230;
+const U_HERO = [61, 62, 60, 12, 8, 86]; // DT, devourer, corsair, bc, wraith, danimoth
+const U_CHECKHEIGHT = 9;
+const U_CHECK_TERRAIN_COLLIDER = 64;
+const U_PATHABLE = 0;
+const U_MONSTER_NEST = 163;
+const U_FALLEN_STAR = 178;
+const U_TREE_TRUNK = 2;
+const U_TREE_BRANCHES = 205;
+const U_ALTAR = 170;
+const U_REVIVAL_ORB = 21;
+const U_ACTION_MARKER = 22;
+// enemy monsters
+const U_ZERGLING = 37;
+const U_BROODLING = 40;
+const U_ULTRALISK = 39;
+const U_HYDRA = 38;
+const U_INFESTED = 50;
+const U_KERRI = 51;
+const U_MUTA = 43;
+const U_GUARDIAN = 44;
+// effects
+const U_DEVOURER = 62;
+
+
+const ISCRIPT_NORMAL = 281;
+const ISCRIPT_FAST = 286;
+const ISCRIPT_LONGFAST = 392;
+const ISCRIPT_GAUSS_RIFLE_HIT = 278;
+
+const IMAGE_ZERG_AIR_DEATH_SMALL = 59;
+const IMAGE_ZERG_AIR_DEATH_LARGE = 58;
+const IMAGE_PLAGUE_CLOUD = 387;
+const IMAGE_HALLUC_DEATH1 = 557;
+const IMAGE_EXPL_BLUE_SMALL = 213;
+const IMAGE_EXPL_ORANGE_MEDIUM = 333;
+const IMAGE_SCOURGE_ATTACK = 4;
+const IMAGE_LONGBOLT_TRAIL = 422;
+const IMAGE_FRAG_GRENADE_HIT = 440;
+const IMAGE_GRENADE_SMOKE = 441;
+const IMAGE_LIGHTNING_STORM = 525;
+const IMAGE_LIGHTNING0 = 550;
+const IMAGE_LIGHTNING1 = 551;
+const IMAGE_LIGHTNING2 = 552;
+const IMAGE_LIGHTNING3 = 553;
+const IMAGE_NUKE_DOT = 233;
+const IMAGE_PHOTON_BLASTERS = 519;
+const IMAGE_PARTICLE_BEAM = 520;
+const IMAGE_SCARAB_MISSILE = 443;
+const IMAGE_BURST_LASER = 447;
+const IMAGE_NEUTRON = 964;
+const IMAGE_GAUSS_RIFLE_HIT = 527;
+const IMAGE_NUKE_DEATH = 428;
+const IMAGE_VENOM_HIT = 508;
+const IMAGE_GEYSER_SMOKE1 = 430;
+const IMAGE_GEYSER_SMOKE2 = 431;
+const IMAGE_GEYSER_SMOKE3 = 432;
+const IMAGE_GEYSER_SMOKE4 = 433;
+const IMAGE_GEYSER_SMOKE5 = 434;
+const IMAGE_SPORES_OVERLAY = 514;
+const IMAGE_GREEN_FLAME0 = 435;
+const IMAGE_GREEN_FLAME1 = 436;
+const IMAGE_GREEN_FLAME2 = 437;
+const IMAGE_GREEN_FLAME3 = 438;
+const IMAGE_GREEN_FLAME4 = 439;
+const IMAGE_ORANGE_FLAME_SMALL0 = 452;
+const IMAGE_UNKNOWN_EXPL = 448;
+
+const DFUNC_WHITE = 17;
+
+const DEFAULT_ATTRIBUTE_COST = 100;
+const DEFAULT_EXP = 5000;
+const HP_REGEN_MAX_TIME = 240;
+const SWORD_MAX_LENGTH = 5;
+const SWORD_MAX_WIDTH = 128;
+const BOW_MAX_COLLISIONS = 5;
+const DASH_POWER_COST = 500;
+const SOFT_UNIT_MAX = 1000;
+const MAX_ALTARS = 10;
+const MAX_ORBS = MAX_ALTARS * 6;
+const TEXT_RANK_ID = 1314;
+
+const screen = StringBuffer();
+
+// @bm debug_enabled
+const debug_enabled = 0;
+const debug_values = EUDArray(8);
+var elapsed_time = 0;
+var main_spawn_timer = 0;
+var snow_update_timer = 0;
+var wind_update_timer = 0;
+var wind_direction = 150;
+var new_wind_direction = 150;
+var unit_count = 0;
+var scan_chunk_current = 0;
+var nests_destroyed = 0;
+function set_nests_destroyed(newValue) {
+    nests_destroyed = newValue;
+}
+var end_game_timer = 0;
+var end_game = 0; // 1 = victory, 2 = defeat
+function set_end_game(newValue) {
+    end_game = newValue;
+    end_game_timer = 120;
+    if (end_game == 1) {
+        DisplayTextAll("\x13\x1F!-- ALL NESTS DESTROYED --!");
+        DisplayTextAll("\x13\x04YOU WIN");
+    } else if (end_game == 2) {
+        DisplayTextAll("\x13\x04!-- ALL KNIGHTS LOST --!");
+        DisplayTextAll("\x13\x06YOU LOSE");
+    }
+
+}
+var cunit_checkheight = 0;
+var cunit_checkterrain = 0;
+var cunit_pathable = 0;
+var wind_ambience_timer = 0;
+var music_timer = 0;
+var players_in_game = 0;
+const altar_cunit = EUDArray(MAX_ALTARS);
+const orb_cunit = EUDArray(MAX_ORBS);
+var nest_ping_timer = 0;
+
+
+const p_cunit = PVariable();
+const p_pos_x = PVariable();
+const p_pos_y = PVariable();
+const p_shields_max = PVariable();
+const p_hp_max = PVariable();
+const p_top_speed = PVariable();
+function set_p_top_speed(playerID, newValue) {
+    p_top_speed[playerID] = newValue;
+    const unit = CUnit(p_cunit[playerID]);
+    unit.topSpeed = p_top_speed[playerID];
+}
+const p_exp_current = PVariable();
+function set_p_exp_current(playerID, newValue) {
+    p_exp_current[playerID] = newValue;
+    SetResources(playerID, SetTo, p_exp_current[playerID], Ore);
+}
+var p_exp_recent = 0;
+var p_exp_recent_timer = 0;
+function set_p_exp_recent(newValue) {
+    if (IsUserCP()) {
+        p_exp_recent = newValue;
+        p_exp_recent_timer = 72;
+    }
+}
+var text_recent_exp = Db(512);
+const p_killstreak_timer = PVariable();
+const p_current_killstreak = PVariable();
+function set_p_current_killstreak(playerID, newValue) {
+    if (newValue > p_current_killstreak[playerID]) p_killstreak_timer[playerID] = 72;
+    p_current_killstreak[playerID] = newValue;
+    // SetResources(playerID, SetTo, p_current_killstreak[playerID], Gas);
+}
+const p_power_max = PVariable();
+const p_power = PVariable();
+function set_p_power(playerID, newValue) {
+    p_power[playerID] = newValue;
+    if (newValue > p_power_max[playerID]) p_power[playerID] = p_power_max[playerID];
+    SetResources(playerID, SetTo, p_power[playerID], Gas);
+}
+const p_strength = PVariable();
+const p_dexterity = PVariable();
+const p_resilience = PVariable();
+const p_agility = PVariable();
+const p_strength_cost = PVariable();
+const p_dexterity_cost = PVariable();
+const p_resilience_cost = PVariable();
+const p_agility_cost = PVariable();
+const p_dash_state = PVariable();
+const p_dash_max_distance = PVariable();
+const p_dash_x = PVariable();
+const p_dash_y = PVariable();
+const p_dash_angle = PVariable();
+const p_hp_regen = PVariable();
+const p_sword_angle = PVariable();
+const p_lives = PVariable();
+function set_p_lives(playerID, newValue) {
+    p_lives[playerID] = newValue;
+    settblf(TEXT_RANK_ID + playerID, 0, "\x02Lives Remaining: \x04{}", p_lives[playerID]);
+}
+const p_death_state = PVariable();
+const p_bow_state = PVariable();
+const p_bow_cooldown = PVariable();
+const p_bow_action = PVariable();
+const p_menu_main = PVariable();
+const MENU_ATTRIBUTES = 1;
+const MENU_REVIVE = 2;
+function set_p_menu_main(playerID, newValue) {
+    if (p_menu_main[playerID] == MENU_ATTRIBUTES) Cmn.ClearTextLines(0, 3);
+    if (p_menu_main[playerID] == MENU_REVIVE) Cmn.ClearTextLines(0, 5);
+    p_menu_main[playerID] = newValue;
+}
+const p_closest_altar = PVariable();
+const p_revive_cost = PVariable();
+function UpdateReviveCost(playerID) {
+    if (
+        p_strength_cost[playerID] >= p_dexterity_cost[playerID] && 
+        p_strength_cost[playerID] >= p_resilience_cost[playerID] && 
+        p_strength_cost[playerID] >= p_agility_cost[playerID]
+    ) p_revive_cost[playerID] = p_strength_cost[playerID];
+    else if (
+        p_dexterity_cost[playerID] >= p_strength_cost[playerID] && 
+        p_dexterity_cost[playerID] >= p_resilience_cost[playerID] && 
+        p_dexterity_cost[playerID] >= p_agility_cost[playerID]
+    ) p_revive_cost[playerID] = p_dexterity_cost[playerID];
+    else if (
+        p_resilience_cost[playerID] >= p_strength_cost[playerID] && 
+        p_resilience_cost[playerID] >= p_dexterity_cost[playerID] && 
+        p_resilience_cost[playerID] >= p_agility_cost[playerID]
+    ) p_revive_cost[playerID] = p_resilience_cost[playerID];
+    else if (
+        p_agility_cost[playerID] >= p_strength_cost[playerID] && 
+        p_agility_cost[playerID] >= p_dexterity_cost[playerID] && 
+        p_agility_cost[playerID] >= p_resilience_cost[playerID]
+    ) p_revive_cost[playerID] = p_agility_cost[playerID];
+}
+const text_show_line = EUDArray(12);
+const text_line = [Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512)];
+const text_line_right = [Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512)];
+
+const keypress_1 = PVariable();
+const keypress_2 = PVariable();
+const keypress_3 = PVariable();
+const keypress_4 = PVariable();
+const keypress_5 = PVariable();
+const keypress_6 = PVariable();
+const keypress_7 = PVariable();
+const keypress_8 = PVariable();
+const keypress_9 = PVariable();
+const keypress_0 = PVariable();
+const keypress_f = PVariable();
+const keypress_g = PVariable();
+const keypress_q = PVariable();
+const keypress_w = PVariable();
+const keypress_e = PVariable();
+const keypress_r = PVariable();
+const keypress_d = PVariable();
+EUDRegisterObjectToNamespace("key_1", keypress_1);
+EUDRegisterObjectToNamespace("key_2", keypress_2);
+EUDRegisterObjectToNamespace("key_3", keypress_3);
+EUDRegisterObjectToNamespace("key_4", keypress_4);
+EUDRegisterObjectToNamespace("key_5", keypress_5);
+EUDRegisterObjectToNamespace("key_6", keypress_6);
+EUDRegisterObjectToNamespace("key_7", keypress_7);
+EUDRegisterObjectToNamespace("key_8", keypress_8);
+EUDRegisterObjectToNamespace("key_9", keypress_9);
+EUDRegisterObjectToNamespace("key_0", keypress_0);
+EUDRegisterObjectToNamespace("key_f", keypress_f);
+EUDRegisterObjectToNamespace("key_g", keypress_g);
+EUDRegisterObjectToNamespace("key_q", keypress_q);
+EUDRegisterObjectToNamespace("key_w", keypress_w);
+EUDRegisterObjectToNamespace("key_e", keypress_e);
+EUDRegisterObjectToNamespace("key_r", keypress_r);
+EUDRegisterObjectToNamespace("key_d", keypress_d);
+
+
+// @bm Functions
+function HeroIsAlive(playerID) {
+    if (Command(playerID, AtLeast, 1, U_HERO[playerID])) return 1;
+    return 0;
+}
+
+
+function CreateCUnit(unitType, location, playerID) : CUnit {
+	const newUnit = CUnit.from_read(EPD(0x628438));
+	CreateUnit(1, unitType, location, playerID);
+    newUnit.unknown0x26 = 0;
+	return newUnit;
+}
+
+
+function UnitIsDamageable(unitType) {
+    switch(unitType) {
+        case 0: return 0;
+        case U_MONSTER_NEST: return 1;
+        case U_ZERGLING: return 1;
+        case U_BROODLING: return 1;
+        case U_ULTRALISK: return 1;
+        case U_HYDRA: return 1;
+        case U_INFESTED: return 1;
+    }
+}
+
+
+const found_units = EUDArray(40);
+function reset_found_units() {
+    for (var i = 0; i < 40; i++) found_units[i] = 0;
+}
+function GetEnemiesAtRect(playerID, left, right, top, bottom, enemiesMax) {
+    var found_count = 0;
+    if (playerID < 6) {
+        foreach(unit : EUDLoopCUnit()) {
+            if (found_count >= enemiesMax) break;
+            if (
+                unit.playerID == $P8 && 
+                UnitIsDamageable(unit.unitType) &&
+                unit.posX >= left &&
+                unit.posX <= right &&
+                unit.posY >= top &&
+                unit.posY <= bottom
+            ) {
+                found_units[found_count] = unit;
+                found_count++;
+            }
+        }
+    }
+    return found_count;
+}
+
+
+function GetKnightsAtRect(playerID, left, right, top, bottom, targetKnight) {
+    var found_count = 0;
+    for (var p = 0; p < 6; p++) {
+        if (targetKnight != -1 && p != targetKnight) continue;
+        if (HeroIsAlive(p)) {
+            const unit = CUnit(p_cunit[p]);
+            if (
+                unit.posX >= left &&
+                unit.posX <= right &&
+                unit.posY >= top &&
+                unit.posY <= bottom
+            ) {
+                found_units[found_count] = unit;
+                found_count++;
+            }
+        }
+    }
+    return found_count;
+}
+
+
+function CreatePlayer(playerID, location) {
+    p_cunit[playerID] = CreateCUnit(U_HERO[playerID], location, playerID);
+}
+
+
+function GetBowDamage(playerID) {
+    return ((p_dexterity[playerID] * 3) + 24) * 256;
+}
+
+
+function GetBowCollisions(playerID) {
+    var value = 1 + (p_strength[playerID] / 10);
+    if (value > BOW_MAX_COLLISIONS) value = BOW_MAX_COLLISIONS;
+    return value;
+}
+
+
+function SetMaxShield(playerID, newValue) {
+    const hero = U_HERO[playerID];
+    var value = newValue;
+    if (value > 9999) value = 9999;
+    wwrite(0x65FD00 + 4352 + hero * 2, value);
+    p_shields_max[playerID] = value;
+    ModifyUnitShields(1, hero, playerID, L_ANYWHERE, 100);
+}
+
+
+function RedeemUnitExp(playerID, unitType) {
+    var add_exp = 0;
+    if (unitType == U_ZERGLING) add_exp = 35;
+    else if (unitType == U_MONSTER_NEST) add_exp = 500;
+    else if (unitType == U_BROODLING) add_exp = 60;
+    else if (unitType == U_HYDRA) add_exp = 60;
+    else if (unitType == U_ULTRALISK) add_exp = 250;
+    else if (unitType == U_INFESTED) add_exp = 100;
+    else if (unitType == U_KERRI) add_exp = 80;
+    else if (unitType == U_MUTA) add_exp = 100;
+    else if (unitType == U_GUARDIAN) add_exp = 200;
+    var killstreak_bonus = p_current_killstreak[playerID] * 10;
+    if (killstreak_bonus > 500) killstreak_bonus = 500;
+    add_exp += killstreak_bonus;
+    for (var p = 0; p < 6; p++) {
+        set_p_exp_current(p, p_exp_current[p] + add_exp);
+    }
+    set_p_exp_recent(p_exp_recent + add_exp);
+}
+
+
+function DoDeathActions(playerID, unit: CUnit) {
+    if (playerID < 6) {
+        RedeemUnitExp(playerID, unit.unitType);
+        set_p_current_killstreak(playerID, p_current_killstreak[playerID] + 1);
+        // nest
+        if (unit.unitType == U_MONSTER_NEST) {
+            set_nests_destroyed(nests_destroyed + 1);
+            setloc(L_MAIN, unit.posX, unit.posY);
+            CreateUnitWithProperties(1, U_ACTION_MARKER, L_MAIN, $P7, UnitProperty(invincible = true));
+        }
+        // fallen star
+        else if (unit.unitType == U_FALLEN_STAR) {
+            for (var p = 0; p < 6; p++) {
+                if (playerexist(p)) SetMaxShield(p, p_shields_max[p] + 50);
+            }
+        }
+    }
+}
+
+
+function DamageCUnit(playerID, unit: CUnit, doDamage) {
+    var target_alive = 1;
+    if (unit.hp == 0 || unit.orderID == 0) {
+        unit.die();
+        return 0;
+    }
+    var damage_remaining = doDamage;
+    if (unit.shield > 0) {
+        if (unit.shield < damage_remaining) {
+            damage_remaining -= unit.shield;
+            unit.shield = 0;
+        } else {
+            unit.shield -= damage_remaining;
+            damage_remaining = 0;
+        }
+    }
+    if (unit.hp <= damage_remaining) {
+        unit.hp = 0;
+    }
+	if (unit.hp == 0) {
+        unit.die();
+        target_alive = 0;
+    } else {
+        unit.hp -= damage_remaining;
+    }
+    if (!target_alive) DoDeathActions(playerID, unit);
+    return target_alive;
+}
+
+
+function PlayWAVCP(soundPath: TrgString, playerID) {
+    if (playerID > 7) return;
+    const old_cp = getcurpl();
+    setcurpl(playerID);
+    PlayWAV(soundPath);
+    setcurpl(old_cp);
+}
+
+
+function PlayWavAtPos(soundPath: TrgString, posX, posY, maxDist) {
+    for (var p = 0; p < 6; p++) { // TODO REFACTOR SO THAT IT USES FOREACH PLAYER LOOP
+        if (HeroIsAlive(p) && Cmn.GetDistance(p_pos_x[p], p_pos_y[p], posX, posY) <= maxDist) {
+            const old_cp = getcurpl();
+            setcurpl(p);
+            PlayWAV(soundPath);
+            setcurpl(old_cp);
+        }
+    }
+}
+
+
+function set_p_hp_regen(playerID, newValue) {
+    p_hp_regen[playerID] = newValue;
+    if (p_hp_regen[playerID] > HP_REGEN_MAX_TIME) p_hp_regen[playerID] = HP_REGEN_MAX_TIME;
+    PlayWAVCP("staredit\\wav\\gain_exp.ogg", playerID);
+    // display text that player got healed?
+}
+
+
+// PROJECTILE TYPES
+const PRO_PLAYER_METEOR = 100;
+const PRO_ARROW_NORMAL = 101;
+const PRO_HEALING_ORB = 102;
+
+
+// @bm PROJECTILE FUNCTIONS
+const PROJECTILE_POOL = 192;
+const pro_owner = EUDArray(PROJECTILE_POOL);
+const pro_posx = EUDArray(PROJECTILE_POOL);
+const pro_posy = EUDArray(PROJECTILE_POOL);
+const pro_time = EUDArray(PROJECTILE_POOL);
+const pro_maxtime = EUDArray(PROJECTILE_POOL);
+const pro_updates_per_frame = EUDArray(PROJECTILE_POOL);
+const pro_angle = EUDArray(PROJECTILE_POOL);
+const pro_velocity = EUDArray(PROJECTILE_POOL);
+const pro_angular_velocity = EUDArray(PROJECTILE_POOL);
+const pro_orbit = EUDArray(PROJECTILE_POOL);
+const pro_orbit_velocity = EUDArray(PROJECTILE_POOL);
+const pro_orbit_dist = EUDArray(PROJECTILE_POOL);
+const pro_effect0_type = EUDArray(PROJECTILE_POOL); //whether the effect is an image or a unit death
+const pro_effect0 = EUDArray(PROJECTILE_POOL);
+const pro_effect0_start = EUDArray(PROJECTILE_POOL);
+const pro_effect0_drawfunc = EUDArray(PROJECTILE_POOL);
+const pro_effect0_iscript = EUDArray(PROJECTILE_POOL);
+const pro_effect1_type = EUDArray(PROJECTILE_POOL);
+const pro_effect1 = EUDArray(PROJECTILE_POOL);
+const pro_effect1_start = EUDArray(PROJECTILE_POOL);
+const pro_effect1_drawfunc = EUDArray(PROJECTILE_POOL);
+const pro_effect1_iscript = EUDArray(PROJECTILE_POOL);
+const pro_effect2_type = EUDArray(PROJECTILE_POOL);
+const pro_effect2 = EUDArray(PROJECTILE_POOL);
+const pro_effect2_start = EUDArray(PROJECTILE_POOL);
+const pro_effect2_drawfunc = EUDArray(PROJECTILE_POOL);
+const pro_effect2_iscript = EUDArray(PROJECTILE_POOL);
+const pro_anglemod0 = EUDArray(PROJECTILE_POOL);
+const pro_anglemod0_start = EUDArray(PROJECTILE_POOL);
+const pro_anglemod1 = EUDArray(PROJECTILE_POOL);
+const pro_anglemod1_start = EUDArray(PROJECTILE_POOL);
+const pro_anglemod2 = EUDArray(PROJECTILE_POOL);
+const pro_anglemod2_start = EUDArray(PROJECTILE_POOL);
+const pro_type_id = EUDArray(PROJECTILE_POOL);
+const pro_target_cunit = EUDArray(PROJECTILE_POOL);
+const pro_collide_enemies = EUDArray(PROJECTILE_POOL);
+const pro_collide_allies = EUDArray(PROJECTILE_POOL);
+const pro_collide_terrain = EUDArray(PROJECTILE_POOL);
+const pro_collide_shape = EUDArray(PROJECTILE_POOL);
+const pro_collide_size = EUDArray(PROJECTILE_POOL);
+const pro_collision_pos_x = EUDArray(PROJECTILE_POOL); // these are results that exist after the projectile has collided with something
+const pro_collision_pos_y = EUDArray(PROJECTILE_POOL);
+const pro_collision_unit = EUDArray(PROJECTILE_POOL);
+const pro_max_collisions = EUDArray(PROJECTILE_POOL);
+function ResetProjectile(i) {
+    pro_owner[i] = 0;
+    pro_time[i] = 0;
+    pro_maxtime[i] = 0;
+    pro_updates_per_frame[i] = 0;
+    pro_posx[i] = 0;
+    pro_posy[i] = 0;
+    pro_angle[i] = 0;
+    pro_velocity[i] = 0;
+    pro_angular_velocity[i] = 0;
+    pro_orbit[i] = 0;
+    pro_orbit_velocity[i] = 0;
+    pro_orbit_dist[i] = 0;
+    pro_effect0_type[i] = 0;
+    pro_effect0[i] = 0;
+    pro_effect0_start[i] = 0;
+    pro_effect0_drawfunc[i] = 0;
+    pro_effect0_iscript[i] = 0;
+    pro_effect1_type[i] = 0;
+    pro_effect1[i] = 0;
+    pro_effect1_start[i] = 0;
+    pro_effect1_drawfunc[i] = 0;
+    pro_effect1_iscript[i] = 0;
+    pro_effect2_type[i] = 0;
+    pro_effect2[i] = 0;
+    pro_effect2_start[i] = 0;
+    pro_effect2_drawfunc[i] = 0;
+    pro_effect2_iscript[i] = 0;
+    pro_anglemod0[i] = 0;
+    pro_anglemod0_start[i] = 0;
+    pro_anglemod1[i] = 0;
+    pro_anglemod1_start[i] = 0;
+    pro_anglemod2[i] = 0;
+    pro_anglemod2_start[i] = 0;
+    pro_type_id[i] = 0;
+    pro_target_cunit[i] = 0;
+    pro_collide_enemies[i] = 0;
+    pro_collide_allies[i] = 0;
+    pro_collide_terrain[i] = 0;
+    pro_collide_shape[i] = 0;
+    pro_collide_size[i] = 0;
+    pro_collision_pos_x[i] = 0;
+    pro_collision_pos_y[i] = 0;
+    pro_collision_unit[i] = 0;
+    pro_max_collisions[i] = 0;
+}
+
+
+var queue_pro_owner = 0;
+var queue_pro_posx = 0;
+var queue_pro_posy = 0;
+var queue_pro_time = 0;
+var queue_pro_maxtime = 0;
+var queue_pro_updates_per_frame = 0;
+var queue_pro_angle = 0;
+var queue_pro_velocity = 0;
+var queue_pro_angular_velocity = 0;
+var queue_pro_orbit = 0;
+var queue_pro_orbit_velocity = 0;
+var queue_pro_orbit_dist = 0;
+var queue_pro_effect0_type = 0;
+var queue_pro_effect0 = 0;
+var queue_pro_effect0_start = 0;
+var queue_pro_effect0_drawfunc = 0;
+var queue_pro_effect0_iscript = 0;
+var queue_pro_effect1_type = 0;
+var queue_pro_effect1 = 0;
+var queue_pro_effect1_start = 0;
+var queue_pro_effect1_drawfunc = 0;
+var queue_pro_effect1_iscript = 0;
+var queue_pro_effect2_type = 0;
+var queue_pro_effect2 = 0;
+var queue_pro_effect2_start = 0;
+var queue_pro_effect2_drawfunc = 0;
+var queue_pro_effect2_iscript = 0;
+const queue_pro_anglemod = EUDArray(3);
+const queue_pro_anglemod_start = EUDArray(3);
+var queue_pro_type_id = 0;
+var queue_pro_target_cunit = 0;
+var queue_pro_collide_enemies = 0;
+var queue_pro_collide_allies = 0;
+var queue_pro_collide_terrain = 0;
+var queue_pro_collide_shape = 0;
+var queue_pro_collide_size = 0;
+var queue_pro_max_collisions = 0;
+function ResetProjectileQueue() {
+    queue_pro_owner = 0;
+    queue_pro_posx = 0;
+    queue_pro_posy = 0;
+    queue_pro_time = 0;
+    queue_pro_maxtime = 0;
+    queue_pro_updates_per_frame = 0;
+    queue_pro_angle = 0;
+    queue_pro_velocity = 0;
+    queue_pro_angular_velocity = 0;
+    queue_pro_orbit = 0;
+    queue_pro_orbit_velocity = 0;
+    queue_pro_orbit_dist = 0;
+    queue_pro_effect0_type = 0;
+    queue_pro_effect0 = 0;
+    queue_pro_effect0_start = 0;
+    queue_pro_effect0_drawfunc = 0;
+    queue_pro_effect0_iscript = 0;
+    queue_pro_effect1_type = 0;
+    queue_pro_effect1 = 0;
+    queue_pro_effect1_start = 0;
+    queue_pro_effect1_drawfunc = 0;
+    queue_pro_effect1_iscript = 0;
+    queue_pro_effect2_type = 0;
+    queue_pro_effect2 = 0;
+    queue_pro_effect2_start = 0;
+    queue_pro_effect2_drawfunc = 0;
+    queue_pro_effect2_iscript = 0;
+    for (var i = 0; i < 3; i++) {
+        queue_pro_anglemod[i] = 0;
+        queue_pro_anglemod_start[i] = 0;
+    }
+    queue_pro_type_id = 0;
+    queue_pro_target_cunit = 0;
+    queue_pro_collide_enemies = 0;
+    queue_pro_collide_allies = 0;
+    queue_pro_collide_terrain = 0;
+    queue_pro_collide_shape = 0;
+    queue_pro_collide_size = 0;
+    queue_pro_max_collisions = 0;
+}
+
+
+function CreateProjectile() {
+    for (var i = 0; i < PROJECTILE_POOL; i++) {
+        if (pro_time[i] == 0) {
+            pro_owner[i] = queue_pro_owner;
+            pro_time[i] = 1;
+            pro_maxtime[i] = queue_pro_maxtime + 2;
+            if (queue_pro_updates_per_frame == 0) pro_updates_per_frame[i] = 1;
+            else pro_updates_per_frame[i] = queue_pro_updates_per_frame;
+            pro_posx[i] = queue_pro_posx;
+            pro_posy[i] = queue_pro_posy;
+            pro_angle[i] = queue_pro_angle;
+            pro_velocity[i] = queue_pro_velocity;
+            pro_angular_velocity[i] = queue_pro_angular_velocity;
+            pro_orbit[i] = queue_pro_angle;
+            pro_orbit_velocity[i] = queue_pro_orbit_velocity;
+            pro_orbit_dist[i] = queue_pro_orbit_dist;
+            pro_effect0_type[i] = queue_pro_effect0_type;
+            pro_effect0[i] = queue_pro_effect0;
+            pro_effect0_start[i] = queue_pro_effect0_start + 2;
+            pro_effect0_drawfunc[i] = queue_pro_effect0_drawfunc;
+            pro_effect0_iscript[i] = queue_pro_effect0_iscript;
+            pro_effect1_type[i] = queue_pro_effect1_type;
+            pro_effect1[i] = queue_pro_effect1;
+            pro_effect1_start[i] = queue_pro_effect1_start + 2;
+            pro_effect1_drawfunc[i] = queue_pro_effect1_drawfunc;
+            pro_effect1_iscript[i] = queue_pro_effect1_iscript;
+            pro_effect2_type[i] = queue_pro_effect2_type;
+            pro_effect2[i] = queue_pro_effect2;
+            pro_effect2_start[i] = queue_pro_effect2_start + 2;
+            pro_effect2_drawfunc[i] = queue_pro_effect2_drawfunc;
+            pro_effect2_iscript[i] = queue_pro_effect2_iscript;
+            pro_anglemod0[i] = queue_pro_anglemod[0];
+            pro_anglemod0_start[i] = queue_pro_anglemod_start[0];
+            pro_anglemod1[i] = queue_pro_anglemod[1];
+            pro_anglemod1_start[i] = queue_pro_anglemod_start[1];
+            pro_anglemod2[i] = queue_pro_anglemod[2];
+            pro_anglemod2_start[i] = queue_pro_anglemod_start[2];
+            pro_type_id[i] = queue_pro_type_id;
+            pro_target_cunit[i] = queue_pro_target_cunit;
+            pro_collide_enemies[i] = queue_pro_collide_enemies;
+            pro_collide_allies[i] = queue_pro_collide_allies;
+            pro_collide_terrain[i] = queue_pro_collide_terrain;
+            pro_collide_shape[i] = queue_pro_collide_shape;
+            pro_collide_size[i] = queue_pro_collide_size;
+            pro_max_collisions[i] = queue_pro_max_collisions;
+            ResetProjectileQueue();
+            break;
+        }
+    }
+}
+
+
+// @bm UpdateProjectiles
+function UpdateProjectiles() {
+    var reset = 0;
+    var collision = 0;
+    for (var i = 0; i < PROJECTILE_POOL; i++) {
+        if (pro_time[i] > 0) {
+            pro_time[i] += 1;
+            var hitmarker = 0;
+            for (var updates = 0; updates < pro_updates_per_frame[i]; updates++) {
+                reset = 0;
+                collision = 0;
+                if (pro_time[i] >= pro_anglemod0_start[i] && pro_time[i] < pro_anglemod1_start[i]) pro_angle[i] = Cmn.AddAngles(pro_angle[i], pro_anglemod0[i]);
+                else if (pro_time[i] >= pro_anglemod1_start[i] && pro_time[i] < pro_anglemod2_start[i]) pro_angle[i] = Cmn.AddAngles(pro_angle[i], pro_anglemod1[i]);
+                else if (pro_time[i] >= pro_anglemod2_start[i]) pro_angle[i] = Cmn.AddAngles(pro_angle[i], pro_anglemod2[i]);
+                pro_angle[i] = Cmn.AddAngles(pro_angle[i], pro_angular_velocity[i]);
+                // TARGET CUNIT
+                if (pro_target_cunit[i] > 0) {
+                    const target_unit = CUnit(pro_target_cunit[i]);
+                    pro_angle[i] = Cmn.GetAngle(pro_posx[i], pro_posy[i], target_unit.posX, target_unit.posY);
+                }
+
+                const new_posx, new_posy = Cmn.MovePosTowards(pro_posx[i], pro_posy[i], pro_angle[i], pro_velocity[i]);
+                pro_posx[i] = new_posx;
+                pro_posy[i] = new_posy;
+
+                // CHECK COLLISION
+                if (pro_collide_enemies[i] || pro_collide_allies[i] || pro_collide_terrain[i]) {
+                    const l, r, t, b = Cmn.PosToSquare(new_posx, new_posy, pro_collide_size[i]);
+                    if (pro_collide_enemies[i] && GetEnemiesAtRect(pro_owner[i], l, r, t, b, 1)) collision = 1;
+                    if (pro_collide_allies[i] && GetKnightsAtRect(pro_owner[i], l, r, t, b, pro_owner[i])) collision = 1;
+                }
+                if (collision && pro_max_collisions[i] > 0) pro_max_collisions[i]--;
+
+                pro_orbit[i] = Cmn.AddAngles(pro_orbit[i], pro_orbit_velocity[i]);
+                const offsetx, offsety = Cmn.MovePosTowards(new_posx, new_posy, pro_orbit[i], pro_orbit_dist[i]);
+                setloc(L_MAIN, offsetx, offsety);
+                // IMAGES
+                if (Cmn.PosIsOnMap(offsetx, offsety) ) {
+                    if (pro_effect0[i] > 0 && pro_time[i] >= pro_effect0_start[i] && pro_time[i] < pro_effect1_start[i]) {
+                        // time for effect 0
+                        if (pro_effect0_type[i] == 0) Cmn.CreateImageSpriteAtLocation($P8, L_MAIN, pro_effect0[i], pro_effect0_drawfunc[i], pro_effect0_iscript[i]);
+                        else Cmn.CreateUnitDeathAtLocation(pro_effect0[i], $P8, L_MAIN);
+                    } else if (pro_effect1[i] > 0 && pro_time[i] >= pro_effect1_start[i] && pro_time[i] < pro_effect2_start[i]) {
+                        // time for effect 1
+                        if (pro_effect1_type[i] == 0) Cmn.CreateImageSpriteAtLocation($P8, L_MAIN, pro_effect1[i], pro_effect1_drawfunc[i], pro_effect1_iscript[i]);
+                        else Cmn.CreateUnitDeathAtLocation(pro_effect1[i], $P8, L_MAIN);
+                    } else if (pro_effect2[i] > 0 && pro_time[i] >= pro_effect2_start[i]) {
+                        // time for effect 2
+                        if (pro_effect2_type[i] == 0) Cmn.CreateImageSpriteAtLocation($P8, L_MAIN, pro_effect2[i], pro_effect2_drawfunc[i], pro_effect2_iscript[i]);
+                        else Cmn.CreateUnitDeathAtLocation(pro_effect2[i], $P8, L_MAIN);
+                    }
+                }
+
+                if (pro_time[i] >= pro_maxtime[i]) reset = 1;
+
+                // TYPE ACTIONS
+                if (pro_type_id[i] == PRO_PLAYER_METEOR) {
+                    if (reset) {
+                        Cmn.CreateImageSpriteAtLocation($P8, L_MAIN, 214, 0, ISCRIPT_FAST);
+                        CreatePlayer(pro_owner[i], L_MAIN);
+                    }
+                } else if (pro_type_id[i] == PRO_ARROW_NORMAL) {
+                    if (collision) {
+                        const bow_damage = GetBowDamage(pro_owner[i]);
+                        Cmn.CreateImageSpriteAtLocation($P8, L_MAIN, IMAGE_ZERG_AIR_DEATH_SMALL, 0, ISCRIPT_FAST);
+                        DamageCUnit(pro_owner[i], found_units[0], bow_damage);
+                        reset_found_units();
+                        hitmarker = 1;
+                        if (pro_max_collisions[i] == 0) {
+                            pro_maxtime[i] = pro_time[i] + 1;
+                            pro_updates_per_frame[i] = 10;
+                            pro_velocity[i] = 8;
+                            pro_effect1[i] = 0;
+                            pro_effect1_start[i] = 0;
+                            pro_effect1_iscript[i] = 0;
+                            pro_effect1_drawfunc[i] = 0;
+                            pro_effect2[i] = IMAGE_UNKNOWN_EXPL;
+                            pro_effect2_iscript[i] = ISCRIPT_FAST;
+                            pro_effect2_start[i] = 0;
+                            pro_effect2_drawfunc[i] = DFUNC_WHITE;
+                            pro_collide_enemies[i] = 0;
+                            pro_collide_size[i] = 0;
+                        }
+                    }
+                } else if (pro_type_id[i] == PRO_HEALING_ORB) {
+                    if (collision) {
+                        set_p_hp_regen(pro_owner[i], p_hp_regen[pro_owner[i]] + 120);
+                        reset_found_units();
+                        reset = 1;
+                    }
+                }
+                if (reset) {
+                    ResetProjectile(i);
+                    break;
+                }
+            } 
+            if (hitmarker) PlayWAVCP("staredit\\wav\\hitmarker.ogg", pro_owner[i]);
+        }
+    }
+}
+
+
+function SetupSystemUnits() {
+    cunit_checkheight = CUnit.from_read(EPD(0x628438));
+    CreateUnitWithProperties(1, U_CHECKHEIGHT, L_CHECK, $P8, UnitProperty(invincible = true));
+    GiveUnits(1, U_CHECKHEIGHT, $P8, L_ANYWHERE, $P12);
+    cunit_pathable = CUnit.from_read(EPD(0x628438));
+    CreateUnitWithProperties(1, U_PATHABLE, L_CHECK, $P8, UnitProperty(invincible = true));
+    GiveUnits(1, U_PATHABLE, $P8, L_ANYWHERE, $P12);
+    const cunit_checkterrain = CUnit.from_read(EPD(0x628438));
+    CreateUnitWithProperties(1, U_CHECK_TERRAIN_COLLIDER, L_CHECK, $P8, UnitProperty(invincible = true));
+    GiveUnits(1, U_CHECK_TERRAIN_COLLIDER, $P8, L_ANYWHERE, $P12);
+    cunit_checkterrain.orderID = 116;
+}
+
+
+function PosIsPathable(posX, posY, distTolerance) {
+    const unit = CUnit(cunit_pathable);
+    setloc(L_MAIN, posX, posY);
+    Cmn.CenterLoc(L_1X1, posX, posY);
+    MoveUnit(All, U_PATHABLE, $P12, L_ANYWHERE, L_MAIN);
+    if (Bring($P12, AtLeast, 1, U_PATHABLE, L_1X1)) {
+        MoveUnit(All, U_PATHABLE, $P12, L_ANYWHERE, L_CHECK);
+        return 1;
+    }
+    if (distTolerance == 0) return 0;
+    if (Cmn.GetDistance(unit.posX, unit.posY, posX, posY) <= distTolerance) {
+        MoveUnit(All, U_PATHABLE, $P12, L_ANYWHERE, L_CHECK);
+        return 1;
+    }
+    MoveUnit(All, U_PATHABLE, $P12, L_ANYWHERE, L_CHECK);
+    return 0;
+}
+
+
+function PosHasTerrainCollider(positionx, positiony) {
+    setloc(L_MAIN, positionx, positiony);
+    MoveUnit(All, U_CHECK_TERRAIN_COLLIDER, $P12, L_ANYWHERE, L_MAIN);
+    if (Bring($P12, AtLeast, 1, U_CHECK_TERRAIN_COLLIDER, L_MAIN)) {
+        MoveUnit(All, U_CHECK_TERRAIN_COLLIDER, $P12, L_ANYWHERE, L_CHECK);
+        return 0;
+    }
+    MoveUnit(All, U_CHECK_TERRAIN_COLLIDER, $P12, L_ANYWHERE, L_CHECK);
+    return 1;
+}
+
+
+function PlayersHaveLives() {
+    for (var p = 0; p < 6; p++) {
+        if (playerexist(p) && p_lives[p] > 0) return 1;
+    }
+    return 0;
+}
+
+
+function SetMaxHP(playerID, newValue) {
+    const hero = U_HERO[playerID];
+    var value = newValue;
+    if (value > 9999) value = 9999;
+    dwwrite_epd(EPD(0x662350) + hero, value * 256);
+    p_hp_max[playerID] = value * 256;
+}
+
+
+function DamageEnemiesAtRect(playerID, posX, posY, rectSize, enemiesMax, doDamage) {
+    const l, r, t, b = Cmn.PosToSquare(posX, posY, rectSize);
+    GetEnemiesAtRect(playerID, l, r, t, b, enemiesMax);
+    for (var e = 0; e < enemiesMax; e++) {
+        DamageCUnit(playerID, found_units[e], doDamage);
+    }
+    reset_found_units();
+}
+
+
+function GetEnemyUnitTotal() {
+    var c = 0;
+    foreach(unit : EUDLoopCUnit()) {
+        if (
+            unit.playerID == $P8 && (
+                unit.unitType == U_ZERGLING ||
+                unit.unitType == U_BROODLING ||
+                unit.unitType == U_ULTRALISK ||
+                unit.unitType == U_HYDRA ||
+                unit.unitType == U_INFESTED
+            )
+        ) {
+            c++;
+        }
+    }
+    return c;
+}
+
+
+function GetMousePosition(playerID) {
+    const x, y = Cmn.GetLocationPoint(L_MOUSE[playerID]);
+    return x, y;
+}
+
+
+function TeleportHeroPos(playerID, posX, posY) {
+    setloc(L_MAIN, posX, posY);
+    MoveUnit(1, U_HERO[playerID], playerID, L_ANYWHERE, L_MAIN);
+    const unit = CUnit(p_cunit[playerID]);
+    p_pos_x[playerID], p_pos_y[playerID] = unit.posX, unit.posY;
+}
+
+
+function CenterLoc(location, x, y) {
+    setloc(L_MAIN, x, y);
+    MoveLocation(location, $U("Map Revealer"), $P12, L_MAIN);
+}
+
+
+function BombardClosestHero(fromX, fromY) {
+    var closest_hero = 0;
+    var current_distance = 100000;
+    for (var p = 0; p < 6; p++) {
+        if (playerexist(p) && HeroIsAlive(p)) {
+            var new_distance = Cmn.GetDistance(fromX, fromY, p_pos_x[p], p_pos_y[p]);
+            if (new_distance < current_distance) {
+                closest_hero = p;
+                current_distance = new_distance;
+            }
+        }
+    }
+    CenterLoc(L_16X16, fromX, fromY);
+    if (current_distance < 100000) setloc(L_MAIN, p_pos_x[closest_hero], p_pos_y[closest_hero]);
+    else setloc(L_MAIN, 4096, 4096);
+    Order(U_MEN, $P8, L_16X16, Patrol, L_MAIN);
+}
+
+
+function ChunkIsSpawnable(forChunkX, forChunkY) {
+    var valid_state = 1;
+    if (forChunkX == 15 && forChunkY >= 14) valid_state = 0;
+    else if (forChunkX >= 14 && forChunkY == 15) valid_state = 0;
+    else if (forChunkX >= 15 && forChunkY >= 15) valid_state = 0;
+    return valid_state;
+}
+
+
+function UpdateChunk(forChunkX, forChunkY) {
+    const center_x = ((forChunkX * 16) * 32) + 256;
+    const center_y = ((forChunkY * 16) * 32) + 256;
+    CenterLoc(L_16X16, center_x, center_y);
+    BombardClosestHero(center_x, center_y);
+}
+
+
+// @bm SpawnMonstersAtChunk
+function SpawnMonstersAtChunk(forChunkX, forChunkY) {
+    if (!ChunkIsSpawnable(forChunkX, forChunkY)) return;
+    unit_count = Cmn.GetUnitTotal();
+    if (unit_count >= SOFT_UNIT_MAX) return;
+    var spawn_x = ((forChunkX * 16) + 8) * 32;
+    var spawn_y = ((forChunkY * 16) + 8) * 32;
+    setloc(L_MAIN, spawn_x, spawn_y);
+    if (nests_destroyed < 5) {
+        CreateUnit(1, U_ZERGLING, L_UNITBUFFER, $P8);
+    } 
+    else if (nests_destroyed >= 5 && nests_destroyed < 10) {
+        CreateUnit(2, U_ZERGLING, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 10 && nests_destroyed < 15) {
+        CreateUnit(3, U_ZERGLING, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 15 && nests_destroyed < 20) {
+        CreateUnit(2, U_ZERGLING, L_UNITBUFFER, $P8);
+        CreateUnit(1, U_BROODLING, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 20 && nests_destroyed < 25) {
+        CreateUnit(2, U_ZERGLING, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_BROODLING, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 25 && nests_destroyed < 30) {
+        CreateUnit(3, U_ZERGLING, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_BROODLING, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 30 && nests_destroyed < 35) {
+        CreateUnit(3, U_ZERGLING, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_BROODLING, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 35 && nests_destroyed < 40) {
+        CreateUnit(2, U_ZERGLING, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_BROODLING, L_UNITBUFFER, $P8);
+        CreateUnit(1, U_HYDRA, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 40 && nests_destroyed < 45) {
+        CreateUnit(2, U_ZERGLING, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_BROODLING, L_UNITBUFFER, $P8);
+        CreateUnit(1, U_HYDRA, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 45 && nests_destroyed < 50) {
+        CreateUnit(3, U_ZERGLING, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_BROODLING, L_UNITBUFFER, $P8);
+        CreateUnit(1, U_HYDRA, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 50 && nests_destroyed < 55) {
+        CreateUnit(2, U_ZERGLING, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_BROODLING, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_HYDRA, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 55 && nests_destroyed < 60) {
+        CreateUnit(1, U_MUTA, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_BROODLING, L_UNITBUFFER, $P8);
+        CreateUnit(1, U_HYDRA, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 60 && nests_destroyed < 65) {
+        CreateUnit(2, U_MUTA, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_BROODLING, L_UNITBUFFER, $P8);
+        CreateUnit(1, U_HYDRA, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 65 && nests_destroyed < 70) {
+        CreateUnit(3, U_MUTA, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_BROODLING, L_UNITBUFFER, $P8);
+        CreateUnit(1, U_HYDRA, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 70 && nests_destroyed < 75) {
+        CreateUnit(3, U_MUTA, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_BROODLING, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_HYDRA, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 75 && nests_destroyed < 80) {
+        CreateUnit(3, U_MUTA, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_HYDRA, L_UNITBUFFER, $P8);
+        CreateUnit(1, U_ULTRALISK, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 80 && nests_destroyed < 85) {
+        CreateUnit(3, U_MUTA, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_HYDRA, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_ULTRALISK, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 85 && nests_destroyed < 90) {
+        CreateUnit(2, U_BROODLING, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_MUTA, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_HYDRA, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_ULTRALISK, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 90 && nests_destroyed < 95) {
+        CreateUnit(3, U_BROODLING, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_HYDRA, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_ULTRALISK, L_UNITBUFFER, $P8);
+        CreateUnit(1, U_KERRI, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 95 && nests_destroyed < 100) {
+        CreateUnit(2, U_BROODLING, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_HYDRA, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_ULTRALISK, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_KERRI, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 100 && nests_destroyed < 105) {
+        CreateUnit(1, U_BROODLING, L_UNITBUFFER, $P8);
+        CreateUnit(1, U_MUTA, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_ULTRALISK, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_KERRI, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 105 && nests_destroyed < 110) {
+        CreateUnit(2, U_MUTA, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_ULTRALISK, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_KERRI, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 110 && nests_destroyed < 115) {
+        CreateUnit(2, U_INFESTED, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_ULTRALISK, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_KERRI, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 115 && nests_destroyed < 120) {
+        CreateUnit(3, U_INFESTED, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_ULTRALISK, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_KERRI, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 120 && nests_destroyed < 125) {
+        CreateUnit(4, U_INFESTED, L_UNITBUFFER, $P8);
+        CreateUnit(1, U_ULTRALISK, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_KERRI, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 125 && nests_destroyed < 130) {
+        CreateUnit(4, U_INFESTED, L_UNITBUFFER, $P8);
+        CreateUnit(4, U_HYDRA, L_UNITBUFFER, $P8);
+        CreateUnit(1, U_KERRI, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 130 && nests_destroyed < 135) {
+        CreateUnit(4, U_INFESTED, L_UNITBUFFER, $P8);
+        CreateUnit(4, U_HYDRA, L_UNITBUFFER, $P8);
+        CreateUnit(1, U_GUARDIAN, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 135 && nests_destroyed < 140) {
+        CreateUnit(2, U_INFESTED, L_UNITBUFFER, $P8);
+        CreateUnit(4, U_HYDRA, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_GUARDIAN, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 140 && nests_destroyed < 145) {
+        CreateUnit(2, U_INFESTED, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_GUARDIAN, L_UNITBUFFER, $P8);
+        CreateUnit(1, U_MUTA, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 145 && nests_destroyed < 150) {
+        CreateUnit(2, U_INFESTED, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_GUARDIAN, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_MUTA, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 150 && nests_destroyed < 155) {
+        CreateUnit(3, U_INFESTED, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_GUARDIAN, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_MUTA, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 155 && nests_destroyed < 160) {
+        CreateUnit(3, U_INFESTED, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_GUARDIAN, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_MUTA, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 160 && nests_destroyed < 165) {
+        CreateUnit(3, U_INFESTED, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_GUARDIAN, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_ULTRALISK, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 165 && nests_destroyed < 170) {
+        CreateUnit(3, U_KERRI, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_GUARDIAN, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_ULTRALISK, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 170 && nests_destroyed < 175) {
+        CreateUnit(4, U_KERRI, L_UNITBUFFER, $P8);
+        CreateUnit(4, U_ZERGLING, L_UNITBUFFER, $P8);
+        CreateUnit(4, U_ULTRALISK, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 175 && nests_destroyed < 180) {
+        CreateUnit(4, U_KERRI, L_UNITBUFFER, $P8);
+        CreateUnit(4, U_ZERGLING, L_UNITBUFFER, $P8);
+        CreateUnit(4, U_ULTRALISK, L_UNITBUFFER, $P8);
+        CreateUnit(1, U_INFESTED, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 180 && nests_destroyed < 185) {
+        CreateUnit(4, U_KERRI, L_UNITBUFFER, $P8);
+        CreateUnit(4, U_ZERGLING, L_UNITBUFFER, $P8);
+        CreateUnit(4, U_ULTRALISK, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_INFESTED, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 185 && nests_destroyed < 190) {
+        CreateUnit(4, U_HYDRA, L_UNITBUFFER, $P8);
+        CreateUnit(8, U_ZERGLING, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_GUARDIAN, L_UNITBUFFER, $P8);
+        CreateUnit(1, U_INFESTED, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 190 && nests_destroyed < 195) {
+        CreateUnit(4, U_HYDRA, L_UNITBUFFER, $P8);
+        CreateUnit(7, U_ZERGLING, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_GUARDIAN, L_UNITBUFFER, $P8);
+        CreateUnit(2, U_INFESTED, L_UNITBUFFER, $P8);
+    }
+    else if (nests_destroyed >= 195 && nests_destroyed < 200) {
+        CreateUnit(5, U_HYDRA, L_UNITBUFFER, $P8);
+        CreateUnit(6, U_ZERGLING, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_GUARDIAN, L_UNITBUFFER, $P8);
+        CreateUnit(3, U_INFESTED, L_UNITBUFFER, $P8);
+    }
+    MoveUnit(All, U_ANY, $P8, L_UNITBUFFER, L_MAIN);
+    RemoveUnitAt(All, U_ANY, L_UNITBUFFER, $P8);
+    CenterLoc(L_16X16, spawn_x, spawn_y);
+    setloc(L_MAIN, 4096, 4096);
+    Order(U_MEN, $P8, L_16X16, Patrol, L_MAIN);
+}
+
+
+function GetAttackSpeed(playerID) {
+    var value = p_dexterity[playerID] / 2;
+    if (value > 20) value = 20;
+    return value;
+}
+
+
+function GetDashMaxDistance(playerID) {
+    var value = 6 + (p_agility[playerID] / 4);
+    if (value > 18) value = 18;
+    return value;
+}
+
+
+function GetTopSpeed(playerID) {
+    var value = 1200 + (p_agility[playerID] / 5) * 100;
+    if (value > 4000) value = 4000;
+    return value;
+}
+
+
+function GetSwordDamage(playerID) {
+    return ((p_strength[playerID] * 3) + 20) * 256;
+}
+
+
+function GetSwordLength(playerID) {
+    var value = 1 + (p_strength[playerID] / 10);
+    if (value > SWORD_MAX_LENGTH) value = SWORD_MAX_LENGTH;
+    return value;
+}
+
+
+function GetSwordWidth(playerID) {
+    var value = p_strength[playerID] * 2;
+    if (value > SWORD_MAX_WIDTH) value = SWORD_MAX_WIDTH;
+    return value;
+}
+
+
+function GetMaxPower(playerID) {
+    return 1000 + ((p_agility[playerID] + p_dexterity[playerID]) * 5);
+}
+
+
+function GetPowerRegen(playerID) {
+    var value = 1 + ((p_strength[playerID] + p_agility[playerID]) / 8);
+    return value;
+}
+
+
+function GetHpRegen(playerID) {
+    return (4 + p_resilience[playerID]) * 64;
+}
+
+
+function GetShieldRegen(playerID) {
+    return (p_resilience[playerID] * 64) + 64;
+}
+
+
+function CreateTree(posX, posY) {
+    CenterLoc(L_1X1, posX, posY);
+    if (Bring(AllPlayers, AtLeast, 1, U_ANY, L_1X1)) return;
+    setloc(L_MAIN, posX, posY);
+    CreateUnit(1, U_TREE_TRUNK, L_MAIN, $P7);
+    setloc(L_MAIN, posX - 8, posY + 24);
+    CreateUnit(1, U_TREE_BRANCHES, L_MAIN, $P7);
+}
+
+
+function CreateTreeCluster(posX, posY, amountX, amountY) {
+    var grid_x = (posX + 32) - ((amountX / 2) * 64);
+    var grid_y = (posY + 32) - ((amountY / 2) * 64);
+    for (var x = 0; x < amountX; x++) {
+        for (var y = 0; y < amountY; y++) {
+            var create_x = grid_x + (x * 64);
+            var create_y = grid_y + (y * 64);
+            const r_x = Cmn.Random(0, 2);
+            const r_y = Cmn.Random(0, 2);
+            if (r_x == 0) create_x += 16;
+            if (r_x == 1) create_x -= 16;
+            if (r_y == 0) create_y += 16;
+            if (r_y == 1) create_y -= 16;
+            CreateTree(create_x, create_y);
+        }
+    }
+}
+
+
+function CreateRevivalOrb(location, altarID) {
+    const unit = CreateCUnit(U_REVIVAL_ORB, location, $P7);
+    unit.unknown0x26 = altarID;
+    unit.unknown0x66 = Cmn.Random(0, 24);
+    return unit;
+}
+
+
+function CreateAltar(location) {
+    const unit = CUnit.from_read(EPD(0x628438));
+    CreateUnitWithProperties(1, U_ALTAR, location, $P7, UnitProperty(invincible = true));
+    ModifyUnitHitPoints(1, U_ALTAR, $P7, location, 10);
+    return unit;
+}
+
+
+function DestroyAltar(altarID) {
+    const unit = CUnit(altar_cunit[altarID]);
+    setloc(L_MAIN, unit.posX, unit.posY);
+    KillUnitAt(1, U_ALTAR, L_MAIN, $P7);
+    altar_cunit[altarID] = 0;
+}
+
+
+function ConsumeOrb(altarID) {
+    var consumption_satisfied = 0;
+    var orbs = 0;
+    for (var i = 0; i < MAX_ORBS; i++) {
+        if (orb_cunit[i] > 0) {
+            const unit = CUnit(orb_cunit[i]);
+            if (unit.unknown0x26 == altarID) {
+                orbs++;
+                if (!consumption_satisfied) {
+                    orbs--;
+                    consumption_satisfied = 1;
+                    unit.remove();
+                    orb_cunit[i] = 0;
+                }
+            }
+        }
+    }
+    if (orbs == 0) DestroyAltar(altarID);
+}
+
+
+function GetRandomSoundArrow() : TrgString {
+    const sound = Cmn.Random(1, 4);
+    if (sound == 1) return $T("staredit/wav/arrow1.ogg");
+    else if (sound == 2) return $T("staredit/wav/arrow2.ogg");
+    else if (sound == 3) return $T("staredit/wav/arrow3.ogg");
+    else return $T("staredit/wav/arrow4.ogg");
+}
+
+
+function UpdateDamageString(playerID) {
+    if (IsUserCP()) {
+        const sword_damage_string = Db(512);
+        const sword_damage = GetSwordDamage(playerID) / 256;
+        sprintf(sword_damage_string, "\x06[S]\x04Sword Damage: \x02{}", sword_damage);
+        const bow_damage_string = Db(512);
+        const bow_damage = GetBowDamage(playerID) / 256;
+        sprintf(bow_damage_string, "\x07[D]\x04Bow Damage: \x02{}", bow_damage);
+        settblf(300, 0, "{:s}\n{:s}\n\x0C", sword_damage_string, bow_damage_string);
+    }
+}
+
+
+function UpdateRegenString(playerID) {
+    if (IsUserCP()) {
+        const hp_regen_string = Db(512);
+        const hp_regen = (GetHpRegen(playerID) * 24) / 256;
+        sprintf(hp_regen_string, "\x1C[R]\x04Healing Regen: \x02{} / sec", hp_regen);
+        const shield_regen_string = Db(512);
+        const shield_regen = (GetShieldRegen(playerID) * 24) / 256;
+        sprintf(shield_regen_string, "\x1C[R]\x04Shield Regen: \x02{} / sec", shield_regen);
+        const power_regen_string = Db(512);
+        const power_regen = GetPowerRegen(playerID) * 24;
+        sprintf(power_regen_string, "\x07[D]\x03[A]\x04Power Regen: \x02{} / sec", power_regen);
+        settblf(92, 0, "{:s}\n{:s}\n{:s}\n\x0C", hp_regen_string, shield_regen_string, power_regen_string);
+    }
+}
+
+
+function SpawnPlayer(playerID) {
+    p_death_state[playerID] = 101;
+    RemoveUnit(U_HERO[playerID], playerID);
+    const spawn_x = Cmn.Random(16, 240) * 32;
+    const spawn_y = Cmn.Random(16, 240) * 32;
+    queue_pro_owner = playerID;
+    queue_pro_type_id = PRO_PLAYER_METEOR;
+    queue_pro_posx = spawn_x + 192;
+    queue_pro_posy = spawn_y - 320;
+    queue_pro_maxtime = 20;
+    queue_pro_angle = Cmn.GetAngle(queue_pro_posx, queue_pro_posy, spawn_x, spawn_y);
+    queue_pro_velocity = 16;
+    queue_pro_effect2 = IMAGE_EXPL_BLUE_SMALL;
+    queue_pro_effect2_iscript = ISCRIPT_FAST;
+    CreateProjectile();
+    setloc(L_MAIN, spawn_x, spawn_y);
+    CenterView(L_MAIN);
+}
+
+
+function CreateHealingOrb(posX, posY, targetPlayer) {
+    queue_pro_owner = targetPlayer;
+    queue_pro_type_id = PRO_HEALING_ORB;
+    queue_pro_posx = posX;
+    queue_pro_posy = posY;
+    queue_pro_maxtime = 120;
+    queue_pro_velocity = 32;
+    queue_pro_target_cunit = p_cunit[targetPlayer];
+    queue_pro_effect2 = IMAGE_VENOM_HIT;
+    queue_pro_effect2_iscript = ISCRIPT_FAST;
+    queue_pro_collide_allies = 1;
+    queue_pro_collide_size = 64;
+    CreateProjectile();
+}
+
+
+// @bm onPluginStart
+function onPluginStart() {
+    randomize();
+    SetupSystemUnits();
+    DisplayTextAll("\x13\x04PURGE THIS LAND OF EVIL.");
+
+    // Initialize Players
+    EUDPlayerLoop()();
+        const p = getcurpl();
+        if (p < 6 && playerexist(p)) {
+            players_in_game++;
+            set_p_exp_current(p, DEFAULT_EXP);
+            p_strength_cost[p] = DEFAULT_ATTRIBUTE_COST;
+            p_dexterity_cost[p] = DEFAULT_ATTRIBUTE_COST;
+            p_resilience_cost[p] = DEFAULT_ATTRIBUTE_COST;
+            p_agility_cost[p] = DEFAULT_ATTRIBUTE_COST;
+            p_shields_max[p] = 100;
+            p_hp_max[p] = 100 * 256;
+            p_power_max[p] = GetMaxPower(p);
+            set_p_power(p, p_power_max[p]);
+            p_dash_max_distance[p] = GetDashMaxDistance(p);
+            set_p_top_speed(p, GetTopSpeed(p));
+            set_p_lives(p, 2);
+            UpdateDamageString(p);
+            UpdateRegenString(p);
+            for (var i = 0; i < 6; i++) {
+                SetAllianceStatus(i, AlliedVictory);
+                Cmn.GetVision(i);
+            }
+            SetAllianceStatus($P7, Ally);
+            SetAllianceStatus($P8, Enemy);
+            SpawnPlayer(p);
+
+            if (debug_enabled) {
+                Cmn.GetVision($P8);
+                set_p_lives(p, 20);
+                set_p_exp_current(p, 100000);
+            }
+        } 
+        else if (p == 7) {
+            for (var i = 0; i < 6; i++) {
+                SetAllianceStatus(i, Enemy);
+            }
+            SetAllianceStatus($P7, Ally);
+        }
+    EUDEndPlayerLoop();
+
+    // Spawn Monster Nests
+    for (var chunk_x = 0; chunk_x < 16; chunk_x++) {
+        for (var chunk_y = 0; chunk_y < 16; chunk_y++) {
+            if (!ChunkIsSpawnable(chunk_x, chunk_y)) continue;
+            var x_offset = (Cmn.Random(0, 11) + (chunk_x * 16)) * 32;
+            var y_offset = (Cmn.Random(0, 11) + (chunk_y * 16)) * 32;
+            x_offset += 64;
+            y_offset += 64;
+            setloc(L_MAIN, x_offset, y_offset);
+            CreateUnit(1, U_MONSTER_NEST, L_MAIN, $P8);
+        }
+    }
+
+    // Remove Excess Nests
+    var to_remove = Cmn.GetCountOfUnit($P8, U_MONSTER_NEST) - 200;
+    var attempts = 0;
+    while (to_remove > 0) {
+        if (attempts >= 400) break;
+        const chunk_x = (Cmn.Random(0, 15) * 16) * 32;
+        const chunk_y = (Cmn.Random(0, 15) * 16) * 32;
+        CenterLoc(L_16X16, chunk_x, chunk_y);
+        if (Bring($P8, AtLeast, 1, U_MONSTER_NEST, L_16X16)) {
+            MoveLocation(L_MAIN, U_MONSTER_NEST, $P8, L_16X16);
+            RemoveUnitAt(1, U_MONSTER_NEST, L_MAIN, $P8);
+            CreateUnit(1, U_FALLEN_STAR, L_MAIN, $P7);
+            ModifyUnitResourceAmount(1, $P7, L_MAIN, 50);
+            to_remove--;
+            // could mark this chunk as "no nest" in the future.
+        }
+        attempts++;
+    }
+
+    // Generate Trees
+    var to_create = 24;
+    while (to_create > 0) {
+        const chunk_x = Cmn.Random(0, 15);
+        const chunk_y = Cmn.Random(0, 15);
+        if (!ChunkIsSpawnable(chunk_x, chunk_y)) continue;
+        const offset_x = ((chunk_x * 16) * 32) + 256;
+        const offset_y = ((chunk_y * 16) * 32) + 256;
+        CreateTreeCluster(offset_x + Cmn.Random(-128, 128), offset_y + Cmn.Random(-128, 128), Cmn.Random(1, 3), Cmn.Random(1, 3));
+        to_create--;
+    }
+
+    // Generate Altars
+    to_create = 10;
+    attempts = 0;
+    var altar_id = 0;
+    var orb_id = 0;
+    while (to_create > 0) {
+        if (attempts >= 400) break;
+        const chunk_x = Cmn.Random(0, 15);
+        const chunk_y = Cmn.Random(0, 15);
+        const offset_x = ((chunk_x * 16) * 32) + 256;
+        const offset_y = ((chunk_y * 16) * 32) + 256;
+        CenterLoc(L_5X5, offset_x, offset_y);
+        if (ChunkIsSpawnable(chunk_x, chunk_y) && Bring(AllPlayers, Exactly, 0, U_ANY, L_5X5)) {
+            altar_cunit[altar_id] = CreateAltar(L_5X5);
+            for (var i = 0; i < players_in_game; i++) {
+                orb_cunit[orb_id] = CreateRevivalOrb(L_5X5, altar_id);
+                orb_id++;
+            }
+            to_create--;
+            altar_id++;
+        }
+        attempts++;
+    }
+
+    // Debug
+    if (debug_enabled) {
+        // setloc(L_MAIN, 4384, 4060);
+        // CreateUnit(1, U_REVIVAL_ORB, L_MAIN, $P1);
+    }
+}
+
+
+// @bm afterTriggerExec
+function afterTriggerExec() {
+    EUDPlayerLoop()();
+        const playerID = getcurpl();
+        if (playerID < 6) {
+            const unit_hero = CUnit(p_cunit[playerID]);
+            const mouse_x, mouse_y = GetMousePosition(playerID);
+            var is_moving = 0;
+
+            if (keypress_w[playerID] == 1) p_bow_action[playerID] = 1;
+            else if (keypress_w[playerID] == 2 && p_bow_action[playerID] == 1) p_bow_action[playerID] = 2;
+            if (p_bow_action[playerID] > 1) {
+                p_bow_action[playerID]++;
+                if (p_bow_action[playerID] >= 6) p_bow_action[playerID] = 0;
+            }
+
+            if (HeroIsAlive(playerID)) {
+                if (p_pos_x[playerID] != unit_hero.posX || p_pos_y[playerID] != unit_hero.posY) is_moving = 1;
+                p_pos_x[playerID] = unit_hero.posX;
+                p_pos_y[playerID] = unit_hero.posY;
+                if (!is_moving && unit_hero.currentSpeed1 > 0) {
+                    unit_hero.currentSpeed1 = 0; // Unit stuck because of flingy movement fix.
+                    unit_hero.currentSpeed2 = 0;
+                }
+            }
+            const unit_hero_x = p_pos_x[playerID];
+            const unit_hero_y = p_pos_y[playerID];
+            if (HeroIsAlive(playerID)) {
+                unit_hero.orderTimer = 0;
+                unit_hero.orderQueueTimer = 0;
+
+                // @bm Power
+                if (p_power[playerID] < p_power_max[playerID]) {
+                    const power_regen = GetPowerRegen(playerID);
+                    set_p_power(playerID, p_power[playerID] + power_regen);
+                }
+
+                // @bm Sword
+                if (unit_hero.groundWeaponCooldown == 26) {
+                    const unit_target = unit_hero.orderTargetUnit;
+                    unit_hero.groundWeaponCooldown -= GetAttackSpeed(playerID);
+                    const sword_width = GetSwordWidth(playerID);
+                    const sword_length = GetSwordLength(playerID);
+                    var dpos_x = unit_target.posX;
+                    var dpos_y = unit_target.posY;
+                    p_sword_angle[playerID] = Cmn.GetAngle(unit_hero_x, unit_hero_y, dpos_x, dpos_y);
+                    if (unit_target.unitType == U_FALLEN_STAR) {
+                        DamageCUnit(playerID, unit_target, 30 * 256);
+                        PlayWAV("staredit\\wav\\mining.ogg");
+                    } else {
+                        for (var instance = 0; instance < sword_length; instance++) {
+                            DamageEnemiesAtRect(playerID, dpos_x, dpos_y, sword_width, 5, GetSwordDamage(playerID));
+                            setloc(L_MAIN, dpos_x, dpos_y);
+                            var distance = sword_width;
+                            if (distance > 64) distance = 64;
+                            dpos_x, dpos_y = Cmn.MovePosTowards(dpos_x, dpos_y, p_sword_angle[playerID], distance);
+                            if (sword_length > 1) {
+                                Cmn.CreateImageSpriteAtLocation($P8, L_MAIN, IMAGE_ZERG_AIR_DEATH_SMALL, 0, ISCRIPT_FAST);
+                            }
+                        }
+                    }
+                }
+
+                // @bm Bow
+                if (p_bow_cooldown[playerID] > 0) p_bow_cooldown[playerID]--;
+                if (p_bow_action[playerID] && p_bow_state[playerID] == 0) {
+                    if (p_bow_cooldown[playerID] == 0) {
+                        p_bow_state[playerID] = 1;
+                        PlayWAV("staredit\\wav\\bow_charge.ogg");
+                    } else {
+                        // cannot use bow.
+                    }
+                }
+                if (p_bow_state[playerID] > 0 && p_bow_state[playerID] <= 10) {
+                    const distance = 66 - (p_bow_state[playerID] * 6);
+                    const angle = Cmn.GetAngle(unit_hero_x, unit_hero_y, mouse_x, mouse_y);
+                    const image0_x, image0_y = Cmn.MovePosTowards(unit_hero_x, unit_hero_y, Cmn.AddAngles(angle, 70), distance);
+                    const image1_x, image1_y = Cmn.MovePosTowards(unit_hero_x, unit_hero_y, Cmn.AddAngles(angle, -70), distance);
+                    const image2_x, image2_y = Cmn.MovePosTowards(unit_hero_x, unit_hero_y, angle, distance);
+                    setloc(L_MAIN, image0_x, image0_y);
+                    Cmn.CreateImageSpriteAtLocation($P8, L_MAIN, 233, 16, ISCRIPT_NORMAL);
+                    setloc(L_MAIN, image1_x, image1_y);
+                    Cmn.CreateImageSpriteAtLocation($P8, L_MAIN, 233, 16, ISCRIPT_NORMAL);
+                    setloc(L_MAIN, image2_x, image2_y);
+                    Cmn.CreateImageSpriteAtLocation($P8, L_MAIN, 233, 16, ISCRIPT_NORMAL);
+                }
+                if (p_bow_state[playerID] == 11) {
+                    const sound_string = GetRandomSoundArrow();
+                    PlayWavAtPos(sound_string, unit_hero_x, unit_hero_y, 320);
+                    queue_pro_owner = playerID;
+                    queue_pro_type_id = PRO_ARROW_NORMAL;
+                    queue_pro_posx, queue_pro_posy = unit_hero_x, unit_hero_y;
+                    queue_pro_maxtime = 16;
+                    queue_pro_angle = Cmn.GetAngle(unit_hero_x, unit_hero_y, mouse_x, mouse_y);
+                    queue_pro_updates_per_frame = 2;
+                    queue_pro_velocity = 32;
+                    queue_pro_effect1 = IMAGE_HALLUC_DEATH1;
+                    queue_pro_effect1_start = 1;
+                    queue_pro_effect1_iscript = ISCRIPT_FAST;
+                    queue_pro_effect1_drawfunc = 17;
+                    queue_pro_effect2 = IMAGE_GRENADE_SMOKE;
+                    queue_pro_effect2_iscript = ISCRIPT_FAST;
+                    queue_pro_effect2_start = 2;
+                    queue_pro_collide_enemies = 1;
+                    queue_pro_collide_size = 48;
+                    queue_pro_max_collisions = GetBowCollisions(playerID);
+                    CreateProjectile();
+                }
+                if (p_bow_state[playerID] > 0) p_bow_state[playerID]++;
+                if (p_bow_state[playerID] >= 13) {
+                    p_bow_state[playerID] = 0;
+                    if ((p_dexterity[playerID] / 2) >= 24) p_bow_cooldown[playerID] = 0;
+                    else p_bow_cooldown[playerID] = 24 - (p_dexterity[playerID] / 2);
+                }
+
+                // Health regen
+                if (p_hp_regen[playerID] > 0) {
+                    p_hp_regen[playerID]--;
+                    if (unit_hero.hp < p_hp_max[playerID]) {
+                        const regen = GetHpRegen(playerID); 
+                        unit_hero.hp += regen;
+                        if (unit_hero.hp > p_hp_max[playerID]) unit_hero.hp = p_hp_max[playerID];
+                    }
+                }
+
+                // Shields
+                const shields_max = p_shields_max[playerID] * 256;
+                if (unit_hero.shield < shields_max) {
+                    const shield_regen = GetShieldRegen(playerID);
+                    if (unit_hero.shield + shield_regen >= shields_max) unit_hero.shield = shields_max;
+                    else unit_hero.shield += shield_regen;
+                }
+
+                // @bm Dash
+                if (keypress_d[playerID] && p_dash_state[playerID] == 0 && p_power[playerID] >= DASH_POWER_COST) {
+                    p_dash_state[playerID] = 1;
+                    p_power[playerID] -= DASH_POWER_COST;
+                }
+                if (p_dash_state[playerID] == 1) {
+                    p_dash_angle[playerID] = Cmn.GetAngle(unit_hero_x, unit_hero_y, mouse_x, mouse_y);
+                    p_dash_x[playerID], p_dash_y[playerID] = Cmn.MovePosTowards(unit_hero_x, unit_hero_y, p_dash_angle[playerID], 16);
+                    const x, y = Cmn.MovePosTowards(p_dash_x[playerID], p_dash_y[playerID], p_dash_angle[playerID], 64);
+                    setloc(L_MAIN, x, y);
+                    Order(U_HERO[playerID], playerID, L_ANYWHERE, Move, L_MAIN);
+                }
+                if (p_dash_state[playerID] > 1) {
+                    const col_posx, col_posy = Cmn.MovePosTowards(p_dash_x[playerID], p_dash_y[playerID], p_dash_angle[playerID], 24);
+                    if (PosHasTerrainCollider(col_posx, col_posy)) {
+
+                    }
+                    if (!PosHasTerrainCollider(col_posx, col_posy)) {
+                        p_dash_x[playerID], p_dash_y[playerID] = col_posx, col_posy;
+                        setloc(L_MAIN, p_dash_x[playerID], p_dash_y[playerID]);
+                        TeleportHeroPos(playerID, p_dash_x[playerID], p_dash_y[playerID]);
+                        queue_pro_posx = p_dash_x[playerID];
+                        queue_pro_posy = p_dash_y[playerID];
+                        queue_pro_maxtime = 6;
+                        queue_pro_angle = (p_dash_angle[playerID] - 180) + Cmn.Random(-10, 10);
+                        queue_pro_velocity = 20;
+                        queue_pro_angular_velocity = Cmn.Random(-1, 1);
+                        queue_pro_effect1 = IMAGE_FRAG_GRENADE_HIT;
+                        queue_pro_effect1_drawfunc = 6;
+                        queue_pro_effect1_iscript = ISCRIPT_FAST;
+                        queue_pro_effect2 = IMAGE_FRAG_GRENADE_HIT;
+                        queue_pro_effect2_start = 3;
+                        queue_pro_effect2_drawfunc = 17;
+                        queue_pro_effect2_iscript = ISCRIPT_FAST;
+                        CreateProjectile();
+                    } else {
+                        p_dash_state[playerID] = p_dash_max_distance[playerID];
+                    }
+                    setloc(L_MAIN, p_dash_x[playerID], p_dash_y[playerID]);
+                    Cmn.CreateImageSpriteAtLocation($P8, L_MAIN, IMAGE_EXPL_BLUE_SMALL, 6, ISCRIPT_FAST);
+                }
+                if (p_dash_state[playerID] > 0) p_dash_state[playerID]++;
+                if (p_dash_state[playerID] >= p_dash_max_distance[playerID]) {
+                    p_dash_x[playerID], p_dash_y[playerID] = Cmn.MovePosTowards(p_dash_x[playerID], p_dash_y[playerID], p_dash_angle[playerID], 64);
+                    setloc(L_MAIN, p_dash_x[playerID], p_dash_y[playerID]);
+                    Order(U_HERO[playerID], playerID, L_ANYWHERE, Move, L_MAIN);
+                    p_dash_state[playerID] = 0;
+                }
+            }
+
+            // @bm Death State
+            if (p_death_state[playerID] == 0 && Command(playerID, Exactly, 0, U_HERO[playerID])) {
+                p_death_state[playerID] = 1;
+                f_printAll("\x04{:n} \x02has fallen!", playerID);
+                PlayWAVAll("staredit\\wav\\player_death.ogg");
+            }
+            if (p_death_state[playerID] > 0 && p_death_state[playerID] < 100) {
+                p_death_state[playerID]++;
+                if (p_death_state[playerID] >= 72) {
+                    p_death_state[playerID] = 100;
+                }
+            }
+            if (p_death_state[playerID] == 100 && p_lives[playerID] > 0) {
+                SpawnPlayer(playerID);
+            }
+            if (p_death_state[playerID] == 101 && HeroIsAlive(playerID)) {
+                if (p_lives[playerID] > 0) set_p_lives(playerID, p_lives[playerID] - 1);
+                p_death_state[playerID] = 0;
+                if (elapsed_time > 72) {
+                    if (p_lives[playerID] == 1) f_printAll("\x04{:n} \x02is back with \x1F1 \x02life remaining!", playerID);
+                    else f_printAll("\x04{:n} \x02is back with \x1F{} \x02lives remaining!", playerID, p_lives[playerID]);
+                }
+            }
+
+            // Killstreak
+            if (p_current_killstreak[playerID] > 0) {
+                if (p_killstreak_timer[playerID] > 0) p_killstreak_timer[playerID]--;
+                if (p_killstreak_timer[playerID] == 0) set_p_current_killstreak(playerID, p_current_killstreak[playerID] - 1);
+            }
+
+            // @bm Text
+            if (IsUserCP() && p_exp_recent > 0) {
+                sprintf(text_line_right[0], "\x12\x1F+{}", p_exp_recent);
+                p_exp_recent = 0;
+            } else if (IsUserCP() && p_exp_recent_timer > 0) {
+                p_exp_recent_timer--;
+                if (p_exp_recent_timer == 0) {
+                    sprintf(text_line_right[0], "\x12\x1F\x0B+0");
+                }
+            }
+                
+            // switch
+            if (HeroIsAlive(playerID)) {
+                CenterLoc(L_5X5, unit_hero_x, unit_hero_y);
+                if (p_menu_main[playerID] != MENU_REVIVE && Bring($P7, AtLeast, 1, U_ALTAR, L_5X5)) {
+                    for (var i = 0; i < MAX_ALTARS; i++) {
+                        const l, r, t, b = Cmn.PosToSquare(unit_hero_x, unit_hero_y, 256);
+                        if (altar_cunit[i] > 0) {
+                            const unit = CUnit(altar_cunit[i]);
+                            if (Cmn.PosIsWithinRect(unit.posX, unit.posY, l, r, t, b)) {
+                                p_closest_altar[playerID] = i;
+                                set_p_menu_main(playerID, MENU_REVIVE);
+                                break;
+                            }
+                        }
+                    }
+                } else if (p_menu_main[playerID] != MENU_ATTRIBUTES && Bring($P7, Exactly, 0, U_ALTAR, L_5X5)) {
+                    set_p_menu_main(playerID, MENU_ATTRIBUTES);
+                }
+            } else if (p_menu_main[playerID] == MENU_REVIVE) {
+                set_p_menu_main(playerID, MENU_ATTRIBUTES);
+            }
+            // display
+            if (p_menu_main[playerID] == MENU_ATTRIBUTES) {
+                var update = 0;
+                if (keypress_1[playerID]) {
+                    if (p_exp_current[playerID] >= p_strength_cost[playerID]) {
+                        set_p_exp_current(playerID, p_exp_current[playerID] - p_strength_cost[playerID]);
+                        p_strength[playerID] += 1;
+                        p_strength_cost[playerID] = (250 * p_strength[playerID]) + 100;
+                        SetMaxHP(playerID, 100 + (p_strength[playerID] * 100));
+                        DisplayText("\x13\x04--+ Increased Strength! +--");
+                        update = 1;
+                    }
+                }
+                if (keypress_2[playerID]) {
+                    if (p_exp_current[playerID] >= p_dexterity_cost[playerID]) {
+                        set_p_exp_current(playerID, p_exp_current[playerID] - p_dexterity_cost[playerID]);
+                        p_dexterity[playerID] += 1;
+                        p_dexterity_cost[playerID] = (250 * p_dexterity[playerID]) + 100;
+                        DisplayText("\x13\x04--+ Increased Dexterity! +--");
+                        update = 1;
+                    }
+                }
+                if (keypress_3[playerID]) {
+                    if (p_exp_current[playerID] >= p_resilience_cost[playerID]) {
+                        set_p_exp_current(playerID, p_exp_current[playerID] - p_resilience_cost[playerID]);
+                        p_resilience[playerID] += 1;
+                        p_resilience_cost[playerID] = (250 * p_resilience[playerID]) + 100;
+                        DisplayText("\x13\x04--+ Increased Resilience! +--");
+                        p_power_max[playerID] = GetMaxPower(playerID);
+                        update = 1;
+                    }
+                }
+                if (keypress_4[playerID]) {
+                    if (p_exp_current[playerID] >= p_agility_cost[playerID]) {
+                        set_p_exp_current(playerID, p_exp_current[playerID] - p_agility_cost[playerID]);
+                        p_agility[playerID] += 1;
+                        p_agility_cost[playerID] = (250 * p_agility[playerID]) + 100;
+                        DisplayText("\x13\x04--+ Increased Agility! +--");
+                        p_dash_max_distance[playerID] = GetDashMaxDistance(playerID);
+                        const speed = GetTopSpeed(playerID);
+                        set_p_top_speed(playerID, speed);
+                        p_power_max[playerID] = GetMaxPower(playerID);
+                        update = 1;
+                    }
+                }
+                if (update) {
+                    PlayWAV("staredit\\wav\\increase_attribute.ogg");
+                    UpdateDamageString(playerID);
+                    UpdateRegenString(playerID);
+                    UpdateReviveCost(playerID);
+                }
+                if (p_strength[playerID] < 10) screen.printfAt(0, "\x03-<1>-\x09\x06[S]\x04trength\x09\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_strength[playerID], p_strength_cost[playerID]);
+                else screen.printfAt(0, "\x03-<1>-\x09\x06[S]\x04trength\x09\x09(\x07{}\x04)\x09|\x09Cost: \x1F{}", p_strength[playerID], p_strength_cost[playerID]);
+                if (p_dexterity[playerID] < 10) screen.printfAt(1, "\x03-<2>-\x09\x07[D]\x04exterity\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_dexterity[playerID], p_dexterity_cost[playerID]);
+                else screen.printfAt(1, "\x03-<2>-\x09\x07[D]\x04exterity\x09(\x07{}\x04)\x09|\x09Cost: \x1F{}", p_dexterity[playerID], p_dexterity_cost[playerID]);
+                if (p_resilience[playerID] < 10) screen.printfAt(2, "\x03-<3>-\x09\x1C[R]\x04esilience\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_resilience[playerID], p_resilience_cost[playerID]);
+                else screen.printfAt(2, "\x03-<3>-\x09\x1C[R]\x04esilience\x09(\x07{}\x04)\x09|\x09Cost: \x1F{}", p_resilience[playerID], p_resilience_cost[playerID]);
+                if (p_agility[playerID] < 10) screen.printfAt(3, "\x03-<4>-\x09\x03[A]\x04gility\x09\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_agility[playerID], p_agility_cost[playerID]);
+                else screen.printfAt(3, "\x03-<4>-\x09\x03[A]\x04gility\x09\x09(\x07{}\x04)\x09\x09|\x09Cost: \x1F{}", p_agility[playerID], p_agility_cost[playerID]);
+            } else if (p_menu_main[playerID] == MENU_REVIVE) {
+                if (players_in_game == 1) {
+                    if (keypress_1[playerID]) {
+                        if (p_exp_current[playerID] >= p_revive_cost[playerID]) {
+                            ConsumeOrb(p_closest_altar[playerID]);
+                            set_p_lives(playerID, p_lives[playerID] + 1);
+                            set_p_exp_current(playerID, p_exp_current[playerID] - p_revive_cost[playerID]);
+                            DisplayText("\x13\x04--+ Gained an Extra Life! +--");
+                        }
+                    }
+                    screen.printfAt(0, "\x03-<1>-\x09\x02Claim this Altar for \x1F{} \x02exp.", p_revive_cost[playerID]);
+                } else {
+                    var purchase = 10;
+                    if (keypress_1[playerID] && p_exp_current[playerID] >= p_revive_cost[$P1]) purchase = $P1;
+                    else if (keypress_2[playerID] && p_exp_current[playerID] >= p_revive_cost[$P2]) purchase = $P2;
+                    else if (keypress_3[playerID] && p_exp_current[playerID] >= p_revive_cost[$P3]) purchase = $P3;
+                    else if (keypress_4[playerID] && p_exp_current[playerID] >= p_revive_cost[$P4]) purchase = $P4;
+                    else if (keypress_5[playerID] && p_exp_current[playerID] >= p_revive_cost[$P5]) purchase = $P5;
+                    else if (keypress_6[playerID] && p_exp_current[playerID] >= p_revive_cost[$P6]) purchase = $P6;
+                    if (purchase != 10 && playerexist(purchase) && !HeroIsAlive(purchase) && p_lives[purchase] == 0) {
+                        ConsumeOrb(p_closest_altar[playerID]);
+                        set_p_lives(purchase, p_lives[purchase] + 1);
+                        set_p_exp_current(playerID, p_exp_current[playerID] - p_revive_cost[purchase]);
+                        f_printAll("\x04{:n} \x02Was revived by \x04{:n}\x02!", purchase, playerID);
+                    }
+                    for (var p = 0; p < 6; p++) {
+                        if (playerexist(p) && !HeroIsAlive(p) && p_lives[p] == 0) screen.printfAt(p, "\x03-<{}>-\x09\x02Revive \x04{:n} \x02for \x1F{} \x02exp.", p+1, p, p_revive_cost[p]);
+                        else if (playerexist(p)) screen.printfAt(p, "\x05-<{}>-\x09\x02Revive \x04{:n} \x02for \x1F{} \x02exp.", p+1, p, p_revive_cost[p]);
+                        else screen.printfAt(p, "\x05-<{}>-", p+1);
+                    }
+                }
+            }
+
+            if (p_menu_main[playerID] > 0) {
+                for (var i = 0; i < 6; i++) {
+                    if (p_menu_main[playerID] == MENU_REVIVE) {
+                        if (playerexist(i) && !HeroIsAlive(i) && p_lives[i] == 0) sprintf(text_line[i], "\x03-<{}>-\x09\x02Revive \x04{:n} \x02for \x1F{} \x02exp.", i+1, i, p_revive_cost[i]);
+                        else if (playerexist(i)) sprintf(text_line[i], "\x05-<{}>-\x09\x02Revive \x04{:n} \x02for \x1F{} \x02exp.", i+1, i, p_revive_cost[i]);
+                        else sprintf(text_line[i], "\x05-<{}>-", i+1);
+                    }
+                    screen.printfAt(i, "{:s}{:s}", text_line[i], text_line_right[i]);
+                }
+            }
+
+            // @bm Sound
+            if (wind_ambience_timer == 0 || wind_ambience_timer == 1397) PlayWAV("staredit\\wav\\wind.ogg");
+            if (music_timer == 0) PlayWAV("staredit\\wav\\wargate.ogg");
+            
+            // @bm Debug Values
+            if (debug_enabled) {
+                debug_values[0] = Cmn.GetUnitTotal();
+                eprintf("{} | {} | {} | {} | {} | {} | {} | {}", debug_values[0], debug_values[1], debug_values[2], debug_values[3], debug_values[4], debug_values[5], debug_values[6], debug_values[7]);
+            }
+
+            // End Game
+            if (end_game == 1 && end_game_timer == 0) {
+                Victory();
+            } else if (end_game == 2 && end_game_timer == 0) {
+                Defeat();
+            }
+        } 
+        else if (playerID == 6) {
+            // Update Orbs
+            for (var i = 0; i < MAX_ORBS; i++) {
+                if (orb_cunit[i] > 0) {
+                    const unit = CUnit(orb_cunit[i]);
+                    if (unit.unknown0x66 > 0) unit.unknown0x66--;
+                    if (unit.unknown0x66 == 0) {
+                        unit.unknown0x66 = 24;
+                        const altar_id = unit.unknown0x26;
+                        const altar = CUnit(altar_cunit[altar_id]);
+                        const d = Cmn.GetDistance(unit.posX, unit.posY, altar.posX, altar.posY);
+                        var new_x = Cmn.Random(-64, 64);
+                        var new_y = Cmn.Random(-64, 64);
+                        if (d > 128) {
+                            setloc(L_MAIN, altar.posX + new_x, altar.posY + new_y);
+                        } else {
+                            setloc(L_MAIN, unit.posX + new_x, unit.posY + new_y);
+                        }
+                        setloc(L_0X0, unit.posX, unit.posY);
+                        unit.unitID = 0;
+                        Order(0, $P7, L_0X0, Move, L_MAIN);
+                        unit.unitID = U_REVIVAL_ORB;
+                    }
+                }
+            }
+
+            // Check Action Markers
+            if (Command($P7, AtLeast, 1, U_ACTION_MARKER)) {
+                MoveLocation(L_MAIN, U_ACTION_MARKER, $P7, L_ANYWHERE);
+                RemoveUnitAt(1, U_ACTION_MARKER, L_MAIN, $P7);
+                const x, y = Cmn.GetLocationPoint(L_MAIN);
+                for (var p = 0; p < 6; p++) {
+                    if (HeroIsAlive(p)) CreateHealingOrb(x, y, p);
+                }
+            }
+
+            // End Game
+            if (end_game == 1 && end_game_timer == 0) {
+                Defeat();
+            } else if (end_game == 2 && end_game_timer == 0) {
+                Victory();
+            }
+        }
+        else if (playerID == 7) {
+            if (Command(playerID, AtMost, 5, U_MONSTER_NEST)) nest_ping_timer++;
+            if (nest_ping_timer >= 48) {
+                nest_ping_timer = 0;
+                MoveLocation(L_MAIN, U_MONSTER_NEST, playerID, L_ANYWHERE);
+                MinimapPingAll(L_MAIN);
+            }
+            // End Game
+            if (end_game == 1 && end_game_timer == 0) {
+                Defeat();
+            } else if (end_game == 2 && end_game_timer == 0) {
+                Victory();
+            }
+        }
+    EUDEndPlayerLoop();
+
+    // Update Projectiles
+    UpdateProjectiles();
+
+    // Update Chunks
+    const scan_y, scan_x = div(scan_chunk_current, 16);
+    UpdateChunk(scan_x, scan_y);
+    scan_chunk_current += 1;
+    if (scan_chunk_current > 255) scan_chunk_current = 0;
+
+    // @bm MAIN SPAWN
+    if (main_spawn_timer > 0) main_spawn_timer -= 1;
+    if (main_spawn_timer == 0) {
+        main_spawn_timer = 1440;
+        for (var chunk_x = 0; chunk_x < 16; chunk_x++) {
+            SpawnMonstersAtChunk(chunk_x, 0);
+            SpawnMonstersAtChunk(chunk_x, 15);
+        }
+        for (var chunk_y = 1; chunk_y < 15; chunk_y++) {
+            SpawnMonstersAtChunk(0, chunk_y);
+            SpawnMonstersAtChunk(15, chunk_y);
+        }
+    }
+
+    // Snow
+    if (SETTING_SNOW_ENABLED) {
+        if (snow_update_timer > 0) snow_update_timer--;
+        if (snow_update_timer == 0) {
+            snow_update_timer = 8;
+            var player_nearby_flags = 0;
+            for (var p = 0; p < 6; p++) {
+                if (!HeroIsAlive(p)) continue;
+                if (playerexist(p) && !Cmn.FlagIsSet(player_nearby_flags, p)) {
+                    CenterLoc(L_10X10, p_pos_x[p], p_pos_y[p]);
+                    for (var i = 0; i < 6; i++) {
+                        if (Bring(i, AtLeast, 1, U_HERO[playerID], L_10X10)) player_nearby_flags = Cmn.SetFlag(player_nearby_flags, i);
+                    }
+                    const offset_x = Cmn.Random(-320, 320);
+                    const offset_y = Cmn.Random(-240, 240);
+                    queue_pro_posx = p_pos_x[p] + offset_x;
+                    queue_pro_posy = (p_pos_y[p] - 96) + offset_y;
+                    queue_pro_maxtime = 40;
+                    queue_pro_angle = wind_direction;
+                    queue_pro_angular_velocity = Cmn.Random(-1, 1);
+                    queue_pro_velocity = 7 + Cmn.Random(0, 2);
+                    if (Cmn.Random(0, 7) == 0) queue_pro_effect2 = IMAGE_LONGBOLT_TRAIL;
+                    else queue_pro_effect2 = IMAGE_NUKE_DOT;
+                    queue_pro_effect2_iscript = ISCRIPT_FAST;
+                    queue_pro_effect2_drawfunc = 17;
+                    CreateProjectile();
+                }
+            }
+        }
+        if (wind_update_timer > 0) wind_update_timer--;
+        if (wind_update_timer == 0) {
+            wind_update_timer = 240 + Cmn.Random(-72, 72);
+            new_wind_direction = 135 + Cmn.Random(-20, 20);
+        }
+        if (wind_direction < new_wind_direction) wind_direction++;
+        if (wind_direction > new_wind_direction) wind_direction--;
+    }
+
+    // Other
+    wind_ambience_timer++;
+    music_timer++;
+    if (wind_ambience_timer >= 2140) wind_ambience_timer = 0;
+    if (music_timer >= 4320) music_timer = 0;
+
+    // @bm End Game
+    if (end_game == 0 && Command($P8, Exactly, 0, U_MONSTER_NEST)) {
+        set_end_game(1);
+    }
+    if (end_game == 0 && !PlayersHaveLives() && Command(Force2, Exactly, 0, U_ANY)) {
+        set_end_game(2);
+    }
+    if (end_game_timer > 0) end_game_timer--;
+    elapsed_time++;
+}
