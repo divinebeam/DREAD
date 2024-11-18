@@ -116,7 +116,7 @@ const TEXT_RANK_ID = 1314;
 const screen = StringBuffer();
 
 // @bm debug_enabled
-const debug_enabled = 0;
+const debug_enabled = 1;
 const debug_values = EUDArray(8);
 var elapsed_time = 0;
 var main_spawn_timer = 0;
@@ -179,7 +179,6 @@ function set_p_exp_recent(newValue) {
         p_exp_recent_timer = 72;
     }
 }
-var text_recent_exp = Db(512);
 const p_killstreak_timer = PVariable();
 const p_current_killstreak = PVariable();
 function set_p_current_killstreak(playerID, newValue) {
@@ -253,6 +252,7 @@ function UpdateReviveCost(playerID) {
 const text_show_line = EUDArray(12);
 const text_line = [Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512)];
 const text_line_right = [Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512)];
+var text_action_timer = 0;
 
 const keypress_1 = PVariable();
 const keypress_2 = PVariable();
@@ -291,6 +291,13 @@ EUDRegisterObjectToNamespace("key_d", keypress_d);
 
 
 // @bm Functions
+function SetActionText(text) {
+    if (IsUserCP()) {
+        text_line_right[1] = text;
+        text_action_timer = 72;
+    }
+}
+
 function HeroIsAlive(playerID) {
     if (Command(playerID, AtLeast, 1, U_HERO[playerID])) return 1;
     return 0;
@@ -1734,15 +1741,24 @@ function afterTriggerExec() {
             }
 
             // @bm Text
-            if (IsUserCP() && p_exp_recent > 0) {
-                sprintf(text_line_right[0], "\x12\x1F+{}", p_exp_recent);
-                p_exp_recent = 0;
-            } else if (IsUserCP() && p_exp_recent_timer > 0) {
-                p_exp_recent_timer--;
-                if (p_exp_recent_timer == 0) {
-                    sprintf(text_line_right[0], "\x12\x1F\x0B+0");
+            if (IsUserCP()) {
+                if (p_exp_recent > 0) {
+                    sprintf(text_line_right[0], "\x12\x1F+{}", p_exp_recent);
+                    p_exp_recent = 0;
+                } else if (p_exp_recent_timer > 0) {
+                    p_exp_recent_timer--;
+                    if (p_exp_recent_timer == 0) {
+                        sprintf(text_line_right[0], "\x12\x0BNothing");
+                    }
+                }
+                if (text_action_timer > 0) {
+                    text_action_timer--;
+                    if (text_action_timer == 0) {
+                        text_line_right[1] = Db("\x12\x0BNothing");
+                    }
                 }
             }
+
                 
             // switch
             if (HeroIsAlive(playerID)) {
@@ -1774,7 +1790,7 @@ function afterTriggerExec() {
                         p_strength[playerID] += 1;
                         p_strength_cost[playerID] = (250 * p_strength[playerID]) + 100;
                         SetMaxHP(playerID, 100 + (p_strength[playerID] * 100));
-                        DisplayText("\x13\x04--+ Increased Strength! +--");
+                        SetActionText(Db("\x12\x04--+ Increased Strength! +--"));
                         update = 1;
                     }
                 }
@@ -1783,7 +1799,7 @@ function afterTriggerExec() {
                         set_p_exp_current(playerID, p_exp_current[playerID] - p_dexterity_cost[playerID]);
                         p_dexterity[playerID] += 1;
                         p_dexterity_cost[playerID] = (250 * p_dexterity[playerID]) + 100;
-                        DisplayText("\x13\x04--+ Increased Dexterity! +--");
+                        SetActionText(Db("\x12\x04--+ Increased Dexterity! +--"));
                         update = 1;
                     }
                 }
@@ -1792,7 +1808,7 @@ function afterTriggerExec() {
                         set_p_exp_current(playerID, p_exp_current[playerID] - p_resilience_cost[playerID]);
                         p_resilience[playerID] += 1;
                         p_resilience_cost[playerID] = (250 * p_resilience[playerID]) + 100;
-                        DisplayText("\x13\x04--+ Increased Resilience! +--");
+                        SetActionText(Db("\x12\x04--+ Increased Resilience! +--"));
                         p_power_max[playerID] = GetMaxPower(playerID);
                         update = 1;
                     }
@@ -1802,7 +1818,7 @@ function afterTriggerExec() {
                         set_p_exp_current(playerID, p_exp_current[playerID] - p_agility_cost[playerID]);
                         p_agility[playerID] += 1;
                         p_agility_cost[playerID] = (250 * p_agility[playerID]) + 100;
-                        DisplayText("\x13\x04--+ Increased Agility! +--");
+                        SetActionText(Db("\x12\x04--+ Increased Agility! +--"));
                         p_dash_max_distance[playerID] = GetDashMaxDistance(playerID);
                         const speed = GetTopSpeed(playerID);
                         set_p_top_speed(playerID, speed);
@@ -1816,14 +1832,6 @@ function afterTriggerExec() {
                     UpdateRegenString(playerID);
                     UpdateReviveCost(playerID);
                 }
-                if (p_strength[playerID] < 10) screen.printfAt(0, "\x03-<1>-\x09\x06[S]\x04trength\x09\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_strength[playerID], p_strength_cost[playerID]);
-                else screen.printfAt(0, "\x03-<1>-\x09\x06[S]\x04trength\x09\x09(\x07{}\x04)\x09|\x09Cost: \x1F{}", p_strength[playerID], p_strength_cost[playerID]);
-                if (p_dexterity[playerID] < 10) screen.printfAt(1, "\x03-<2>-\x09\x07[D]\x04exterity\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_dexterity[playerID], p_dexterity_cost[playerID]);
-                else screen.printfAt(1, "\x03-<2>-\x09\x07[D]\x04exterity\x09(\x07{}\x04)\x09|\x09Cost: \x1F{}", p_dexterity[playerID], p_dexterity_cost[playerID]);
-                if (p_resilience[playerID] < 10) screen.printfAt(2, "\x03-<3>-\x09\x1C[R]\x04esilience\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_resilience[playerID], p_resilience_cost[playerID]);
-                else screen.printfAt(2, "\x03-<3>-\x09\x1C[R]\x04esilience\x09(\x07{}\x04)\x09|\x09Cost: \x1F{}", p_resilience[playerID], p_resilience_cost[playerID]);
-                if (p_agility[playerID] < 10) screen.printfAt(3, "\x03-<4>-\x09\x03[A]\x04gility\x09\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_agility[playerID], p_agility_cost[playerID]);
-                else screen.printfAt(3, "\x03-<4>-\x09\x03[A]\x04gility\x09\x09(\x07{}\x04)\x09\x09|\x09Cost: \x1F{}", p_agility[playerID], p_agility_cost[playerID]);
             } else if (p_menu_main[playerID] == MENU_REVIVE) {
                 if (players_in_game == 1) {
                     if (keypress_1[playerID]) {
@@ -1831,10 +1839,9 @@ function afterTriggerExec() {
                             ConsumeOrb(p_closest_altar[playerID]);
                             set_p_lives(playerID, p_lives[playerID] + 1);
                             set_p_exp_current(playerID, p_exp_current[playerID] - p_revive_cost[playerID]);
-                            DisplayText("\x13\x04--+ Gained an Extra Life! +--");
+                            SetActionText(Db("\x12\x04--+ Gained an Extra Life! +--"));
                         }
                     }
-                    screen.printfAt(0, "\x03-<1>-\x09\x02Claim this Altar for \x1F{} \x02exp.", p_revive_cost[playerID]);
                 } else {
                     var purchase = 10;
                     if (keypress_1[playerID] && p_exp_current[playerID] >= p_revive_cost[$P1]) purchase = $P1;
@@ -1849,23 +1856,40 @@ function afterTriggerExec() {
                         set_p_exp_current(playerID, p_exp_current[playerID] - p_revive_cost[purchase]);
                         f_printAll("\x04{:n} \x02Was revived by \x04{:n}\x02!", purchase, playerID);
                     }
-                    for (var p = 0; p < 6; p++) {
-                        if (playerexist(p) && !HeroIsAlive(p) && p_lives[p] == 0) screen.printfAt(p, "\x03-<{}>-\x09\x02Revive \x04{:n} \x02for \x1F{} \x02exp.", p+1, p, p_revive_cost[p]);
-                        else if (playerexist(p)) screen.printfAt(p, "\x05-<{}>-\x09\x02Revive \x04{:n} \x02for \x1F{} \x02exp.", p+1, p, p_revive_cost[p]);
-                        else screen.printfAt(p, "\x05-<{}>-", p+1);
-                        // hello
-                    }
                 }
             }
 
             if (p_menu_main[playerID] > 0) {
                 for (var i = 0; i < 6; i++) {
-                    if (p_menu_main[playerID] == MENU_REVIVE) {
-                        if (playerexist(i) && !HeroIsAlive(i) && p_lives[i] == 0) sprintf(text_line[i], "\x03-<{}>-\x09\x02Revive \x04{:n} \x02for \x1F{} \x02exp.", i+1, i, p_revive_cost[i]);
-                        else if (playerexist(i)) sprintf(text_line[i], "\x05-<{}>-\x09\x02Revive \x04{:n} \x02for \x1F{} \x02exp.", i+1, i, p_revive_cost[i]);
-                        else sprintf(text_line[i], "\x05-<{}>-", i+1);
+                    var show_line = 0;
+                    if (p_menu_main[playerID] == MENU_ATTRIBUTES) {
+                        if (i < 4) show_line = 1;
+                        if (i == 0) {
+                            if (p_strength[playerID] < 10) sprintf(text_line[i], "\x03-<1>-\x09\x06[S]\x04trength\x09\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_strength[playerID], p_strength_cost[playerID]);
+                            else sprintf(text_line[i], "\x03-<1>-\x09\x06[S]\x04trength\x09\x09(\x07{}\x04)\x09|\x09Cost: \x1F{}", p_strength[playerID], p_strength_cost[playerID]);
+                        } else if (i == 1) {
+                            if (p_dexterity[playerID] < 10) sprintf(text_line[i], "\x03-<2>-\x09\x07[D]\x04exterity\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_dexterity[playerID], p_dexterity_cost[playerID]);
+                            else sprintf(text_line[i], "\x03-<2>-\x09\x07[D]\x04exterity\x09(\x07{}\x04)\x09|\x09Cost: \x1F{}", p_dexterity[playerID], p_dexterity_cost[playerID]);
+                        } else if (i == 2) {
+                            if (p_resilience[playerID] < 10) sprintf(text_line[i], "\x03-<3>-\x09\x1C[R]\x04esilience\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_resilience[playerID], p_resilience_cost[playerID]);
+                            else sprintf(text_line[i], "\x03-<3>-\x09\x1C[R]\x04esilience\x09(\x07{}\x04)\x09|\x09Cost: \x1F{}", p_resilience[playerID], p_resilience_cost[playerID]);
+                        } else if (i == 3) {
+                            if (p_agility[playerID] < 10) sprintf(text_line[i], "\x03-<4>-\x09\x03[A]\x04gility\x09\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_agility[playerID], p_agility_cost[playerID]);
+                            else sprintf(text_line[i], "\x03-<4>-\x09\x03[A]\x04gility\x09\x09(\x07{}\x04)\x09\x09|\x09Cost: \x1F{}", p_agility[playerID], p_agility_cost[playerID]);
+                        }
                     }
-                    screen.printfAt(i, "{:s}{:s}", text_line[i], text_line_right[i]);
+                    else if (p_menu_main[playerID] == MENU_REVIVE) {
+                        if (players_in_game == 1 && i == 0) {
+                            show_line = 1;
+                            sprintf(text_line[i], "\x03-<1>-\x09\x02Claim this Altar for \x1F{} \x02exp.", p_revive_cost[playerID]);
+                        } else if (players_in_game > 0) {
+                            show_line = 1;
+                            if (playerexist(i) && !HeroIsAlive(i) && p_lives[i] == 0) sprintf(text_line[i], "\x03-<{}>-\x09\x02Revive \x04{:n} \x02for \x1F{} \x02exp.", i+1, i, p_revive_cost[i]);
+                            else if (playerexist(i)) sprintf(text_line[i], "\x05-<{}>-\x09\x02Revive \x04{:n} \x02for \x1F{} \x02exp.", i+1, i, p_revive_cost[i]);
+                            else sprintf(text_line[i], "\x05-<{}>-", i+1);
+                        }
+                    }
+                    if (show_line) screen.printfAt(i, "{:s}{:s}", text_line[i], text_line_right[i]);
                 }
             }
 
@@ -1875,7 +1899,7 @@ function afterTriggerExec() {
             
             // @bm Debug Values
             if (debug_enabled) {
-                debug_values[0] = Cmn.GetUnitTotal();
+                debug_values[0] = p_menu_main[playerID];
                 eprintf("{} | {} | {} | {} | {} | {} | {} | {}", debug_values[0], debug_values[1], debug_values[2], debug_values[3], debug_values[4], debug_values[5], debug_values[6], debug_values[7]);
             }
 
