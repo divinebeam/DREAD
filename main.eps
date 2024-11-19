@@ -16,6 +16,7 @@ const L_3X3 = $L("3x3");
 const L_5X5 = $L("5x5");
 const L_10X10 = $L("16x16");
 const L_16X16 = $L("16x16");
+const L_30X30 = $L("30x30");
 const L_MOUSE = [4, 5, 6, 7, 8, 9];
 const L_UTILITY = [19, 20, 21, 22, 23, 24];
 
@@ -121,7 +122,7 @@ const MAX_BOW_ATTACK_SPEED = 24;
 const screen = StringBuffer();
 
 // @bm debug_enabled
-const debug_enabled = 1;
+const debug_enabled = 0;
 const debug_values = EUDArray(8);
 var elapsed_time = 0;
 var main_spawn_timer = 0;
@@ -258,6 +259,7 @@ function UpdateReviveCost(playerID) {
 }
 const p_stat_kills = PVariable();
 var p_camera_follow = 0;
+const p_aggro_timer = PVariable();
 
 const text_show_line = EUDArray(12);
 const text_line = [Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512)];
@@ -954,7 +956,7 @@ function TeleportHeroPos(playerID, posX, posY) {
 }
 
 
-function BombardClosestHero(fromX, fromY) {
+function BombardClosestHero(fromX, fromY, location) {
     var closest_hero = 0;
     var current_distance = 100000;
     for (var p = 0; p < 6; p++) {
@@ -966,10 +968,10 @@ function BombardClosestHero(fromX, fromY) {
             }
         }
     }
-    CenterLoc(L_16X16, fromX, fromY);
+    CenterLoc(location, fromX, fromY);
     if (current_distance < 100000) setloc(L_MAIN, p_pos_x[closest_hero], p_pos_y[closest_hero]);
     else setloc(L_MAIN, 4096, 4096);
-    Order(U_MEN, $P8, L_16X16, Patrol, L_MAIN);
+    Order(U_MEN, $P8, location, Patrol, L_MAIN);
 }
 
 
@@ -985,8 +987,7 @@ function ChunkIsSpawnable(forChunkX, forChunkY) {
 function UpdateChunk(forChunkX, forChunkY) {
     const center_x = ((forChunkX * 16) * 32) + 256;
     const center_y = ((forChunkY * 16) * 32) + 256;
-    CenterLoc(L_16X16, center_x, center_y);
-    BombardClosestHero(center_x, center_y);
+    BombardClosestHero(center_x, center_y, L_16X16);
 }
 
 
@@ -1765,11 +1766,23 @@ function afterTriggerExec() {
                     setloc(L_MAIN, p_dash_x[playerID], p_dash_y[playerID]);
                     Order(U_HERO[playerID], playerID, L_ANYWHERE, Move, L_MAIN);
                     p_dash_state[playerID] = 0;
+                    p_aggro_timer[playerID] = 0;
                 }
 
                 if (p_camera_follow) {
                     setloc(L_UTILITY[playerID], unit_hero_x, unit_hero_y);
                     CenterView(L_UTILITY[playerID]);
+                }
+
+                // aggro
+                if (p_aggro_timer[playerID] > 0) {
+                    p_aggro_timer[playerID]--;
+                    if (is_moving && p_aggro_timer[playerID] > 48) p_aggro_timer[playerID] = 48;
+                }
+                if (p_aggro_timer[playerID] == 0) {
+                    BombardClosestHero(unit_hero_x, unit_hero_y, L_30X30);
+                    if (is_moving) p_aggro_timer[playerID] = 48;
+                    else p_aggro_timer[playerID] = 120;
                 }
             }
 
@@ -2007,7 +2020,7 @@ function afterTriggerExec() {
             
             // @bm Debug Values
             if (debug_enabled) {
-                debug_values[0] = p_menu_attri_mode[playerID];
+                debug_values[0] = p_aggro_timer[playerID];
                 eprintf("{} | {} | {} | {} | {} | {} | {} | {}", debug_values[0], debug_values[1], debug_values[2], debug_values[3], debug_values[4], debug_values[5], debug_values[6], debug_values[7]);
             }
 
