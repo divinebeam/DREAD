@@ -160,6 +160,7 @@ const orb_cunit = EUDArray(MAX_ORBS);
 var nest_ping_timer = 0;
 
 
+const p_in_game = PVariable();
 const p_cunit = PVariable();
 const p_pos_x = PVariable();
 const p_pos_y = PVariable();
@@ -223,6 +224,7 @@ const p_bow_state = PVariable();
 const p_bow_cooldown = PVariable();
 const p_bow_action = PVariable();
 const p_menu_main = PVariable();
+const p_menu_attri_mode = PVariable();
 const MENU_ATTRIBUTES = 1;
 const MENU_REVIVE = 2;
 function set_p_menu_main(playerID, newValue) {
@@ -262,6 +264,7 @@ const text_line = [Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512)
 const text_line_right = [Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512)];
 var text_action_timer = 0;
 
+// @bm keypress declarations
 const keypress_1 = PVariable();
 const keypress_2 = PVariable();
 const keypress_3 = PVariable();
@@ -279,6 +282,7 @@ const keypress_r = PVariable();
 const keypress_d = PVariable();
 const keypress_shift = PVariable();
 const keypress_space = PVariable();
+const keypress_y = PVariable();
 EUDRegisterObjectToNamespace("key_1", keypress_1);
 EUDRegisterObjectToNamespace("key_2", keypress_2);
 EUDRegisterObjectToNamespace("key_3", keypress_3);
@@ -296,6 +300,7 @@ EUDRegisterObjectToNamespace("key_r", keypress_r);
 EUDRegisterObjectToNamespace("key_d", keypress_d);
 EUDRegisterObjectToNamespace("key_shift", keypress_shift);
 EUDRegisterObjectToNamespace("key_space", keypress_space);
+EUDRegisterObjectToNamespace("key_y", keypress_y);
 
 
 // @bm Functions
@@ -1443,6 +1448,7 @@ function onPluginStart() {
         const p = getcurpl();
         if (p < 6 && playerexist(p)) {
             players_in_game++;
+            p_in_game[p] = 1;
             set_p_exp_current(p, DEFAULT_EXP);
             p_strength_cost[p] = DEFAULT_ATTRIBUTE_COST;
             p_dexterity_cost[p] = DEFAULT_ATTRIBUTE_COST;
@@ -1558,6 +1564,15 @@ function onPluginStart() {
 
 // @bm afterTriggerExec
 function afterTriggerExec() {
+    // check for dead players
+    for (var p = 0; p < 6; p++) {
+        if (!playerexist(p) && p_in_game[p]) {
+            // p left the game
+            p_in_game[p] = 0;
+            RemoveUnit(U_HERO[p], $P12);
+            players_in_game--;
+        }
+    }
     EUDPlayerLoop()();
         const playerID = getcurpl();
         if (playerID < 6) {
@@ -1788,7 +1803,7 @@ function afterTriggerExec() {
                 if (p_killstreak_timer[playerID] == 0) set_p_current_killstreak(playerID, p_current_killstreak[playerID] - 1);
             }
 
-            // @bm Text    
+            // @bm Text
             // switch
             if (HeroIsAlive(playerID)) {
                 CenterLoc(L_5X5, unit_hero_x, unit_hero_y);
@@ -1811,6 +1826,17 @@ function afterTriggerExec() {
                 set_p_menu_main(playerID, MENU_ATTRIBUTES);
             }
             // input
+            // change attribute menu mode
+            if (keypress_y[playerID]) {
+                if (p_menu_attri_mode[playerID] == 0) {
+                    p_menu_attri_mode[playerID] = 1;
+                } else if (p_menu_attri_mode[playerID] == 1) {
+                    p_menu_attri_mode[playerID] = 2;
+                    Cmn.ClearTextLines(0, 3);
+                } else if (p_menu_attri_mode[playerID] == 2) {
+                    p_menu_attri_mode[playerID] = 0;
+                }
+            }
             if (p_menu_main[playerID] == MENU_ATTRIBUTES) {
                 var update = 0;
                 if (keypress_1[playerID]) {
@@ -1902,7 +1928,6 @@ function afterTriggerExec() {
                 }
                 if (text_action_timer > 0) {
                     text_action_timer--;
-                    debug_values[0] = text_action_timer;
                     if (text_action_timer == 0) {
                         text_line_right[1] = Db("\x12\x0BNothing");
                     }
@@ -1914,17 +1939,44 @@ function afterTriggerExec() {
                     if (p_menu_main[playerID] == MENU_ATTRIBUTES) {
                         if (i < 4) show_line = 1;
                         if (i == 0) {
-                            if (p_strength[playerID] < 10) sprintf(text_line[i], "\x03-<1>-\x09\x06[S]\x04trength\x09\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_strength[playerID], p_strength_cost[playerID]);
-                            else sprintf(text_line[i], "\x03-<1>-\x09\x06[S]\x04trength\x09\x09(\x07{}\x04)\x09|\x09Cost: \x1F{}", p_strength[playerID], p_strength_cost[playerID]);
+                            if (p_menu_attri_mode[playerID] == 0) {
+                                if (p_strength[playerID] < 10) sprintf(text_line[i], "\x03-<1>-\x09\x06[S]\x04trength\x09\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_strength[playerID], p_strength_cost[playerID]);
+                                else sprintf(text_line[i], "\x03-<1>-\x09\x06[S]\x04trength\x09\x09(\x07{}\x04)\x09|\x09Cost: \x1F{}", p_strength[playerID], p_strength_cost[playerID]);
+                            } else if (p_menu_attri_mode[playerID] == 1) {
+                                sprintf(text_line[i], "\x06[S]\x09\x04Cost:\x09\x1F{}", p_strength_cost[playerID]);
+                            } else if (p_menu_attri_mode[playerID] == 2) {
+                                sprintf(text_line[i], ".");
+                            }
+
                         } else if (i == 1) {
-                            if (p_dexterity[playerID] < 10) sprintf(text_line[i], "\x03-<2>-\x09\x07[D]\x04exterity\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_dexterity[playerID], p_dexterity_cost[playerID]);
-                            else sprintf(text_line[i], "\x03-<2>-\x09\x07[D]\x04exterity\x09(\x07{}\x04)\x09|\x09Cost: \x1F{}", p_dexterity[playerID], p_dexterity_cost[playerID]);
+                            if (p_menu_attri_mode[playerID] == 0) {
+                                if (p_dexterity[playerID] < 10) sprintf(text_line[i], "\x03-<2>-\x09\x07[D]\x04exterity\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_dexterity[playerID], p_dexterity_cost[playerID]);
+                                else sprintf(text_line[i], "\x03-<2>-\x09\x07[D]\x04exterity\x09(\x07{}\x04)\x09|\x09Cost: \x1F{}", p_dexterity[playerID], p_dexterity_cost[playerID]);
+                            } else if (p_menu_attri_mode[playerID] == 1) {
+                                sprintf(text_line[i], "\x07[D]\x09\x04Cost:\x09\x1F{}", p_dexterity_cost[playerID]);
+                            } else if (p_menu_attri_mode[playerID] == 2) {
+                                sprintf(text_line[i], ".");
+                            }
+
                         } else if (i == 2) {
-                            if (p_resilience[playerID] < 10) sprintf(text_line[i], "\x03-<3>-\x09\x1C[R]\x04esilience\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_resilience[playerID], p_resilience_cost[playerID]);
-                            else sprintf(text_line[i], "\x03-<3>-\x09\x1C[R]\x04esilience\x09(\x07{}\x04)\x09|\x09Cost: \x1F{}", p_resilience[playerID], p_resilience_cost[playerID]);
+                            if (p_menu_attri_mode[playerID] == 0) {
+                                if (p_resilience[playerID] < 10) sprintf(text_line[i], "\x03-<3>-\x09\x1C[R]\x04esilience\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_resilience[playerID], p_resilience_cost[playerID]);
+                                else sprintf(text_line[i], "\x03-<3>-\x09\x1C[R]\x04esilience\x09(\x07{}\x04)\x09|\x09Cost: \x1F{}", p_resilience[playerID], p_resilience_cost[playerID]);
+                            } else if (p_menu_attri_mode[playerID] == 1) {
+                                sprintf(text_line[i], "\x1C[R]\x09\x04Cost:\x09\x1F{}", p_resilience_cost[playerID]);
+                            } else if (p_menu_attri_mode[playerID] == 2) {
+                                show_line = 0;
+                            }
+
                         } else if (i == 3) {
-                            if (p_agility[playerID] < 10) sprintf(text_line[i], "\x03-<4>-\x09\x03[A]\x04gility\x09\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_agility[playerID], p_agility_cost[playerID]);
-                            else sprintf(text_line[i], "\x03-<4>-\x09\x03[A]\x04gility\x09\x09(\x07{}\x04)\x09\x09|\x09Cost: \x1F{}", p_agility[playerID], p_agility_cost[playerID]);
+                            if (p_menu_attri_mode[playerID] == 0) {
+                                if (p_agility[playerID] < 10) sprintf(text_line[i], "\x03-<4>-\x09\x03[A]\x04gility\x09\x09(\x070{}\x04)\x09|\x09Cost: \x1F{}", p_agility[playerID], p_agility_cost[playerID]);
+                                else sprintf(text_line[i], "\x03-<4>-\x09\x03[A]\x04gility\x09\x09(\x07{}\x04)\x09\x09|\x09Cost: \x1F{}", p_agility[playerID], p_agility_cost[playerID]);
+                            } else if (p_menu_attri_mode[playerID] == 1) {
+                                sprintf(text_line[i], "\x03[A]\x09\x04Cost:\x09\x1F{}", p_agility_cost[playerID]);
+                            } else if (p_menu_attri_mode[playerID] == 2) {
+                                show_line = 0;
+                            }
                         }
                     }
                     else if (p_menu_main[playerID] == MENU_REVIVE) {
@@ -1955,6 +2007,7 @@ function afterTriggerExec() {
             
             // @bm Debug Values
             if (debug_enabled) {
+                debug_values[0] = p_menu_attri_mode[playerID];
                 eprintf("{} | {} | {} | {} | {} | {} | {} | {}", debug_values[0], debug_values[1], debug_values[2], debug_values[3], debug_values[4], debug_values[5], debug_values[6], debug_values[7]);
             }
 
