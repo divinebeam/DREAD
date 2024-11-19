@@ -124,6 +124,7 @@ const screen = StringBuffer();
 // @bm debug_enabled
 const debug_enabled = 0;
 const debug_values = EUDArray(8);
+const show_debug_values_p1 = 1;
 var elapsed_time = 0;
 var main_spawn_timer = 0;
 var snow_update_timer = 0;
@@ -347,6 +348,23 @@ function CreateCUnit(unitType, location, playerID) : CUnit {
 }
 
 
+function UnitIsMob(unitType) {
+    if (
+        unitType == U_ZERGLING ||
+        unitType == U_BROODLING ||
+        unitType == U_ULTRALISK ||
+        unitType == U_HYDRA ||
+        unitType == U_INFESTED ||
+        unitType == U_KERRI ||
+        unitType == U_MUTA ||
+        unitType == U_GUARDIAN
+    ) {
+        return 1;
+    }
+    return 0;
+}
+
+
 function UnitIsDamageable(unitType) {
     if (
         unitType == U_MONSTER_NEST ||
@@ -463,6 +481,7 @@ function DoDeathActions(playerID, unit: CUnit) {
     if (playerID < 6) {
         RedeemUnitExp(playerID, unit.unitType);
         set_p_current_killstreak(playerID, p_current_killstreak[playerID] + 1);
+        p_stat_kills[playerID]++;
         // nest
         if (unit.unitType == U_MONSTER_NEST) {
             set_nests_destroyed(nests_destroyed + 1);
@@ -845,7 +864,11 @@ function UpdateProjectiles() {
                     break;
                 }
             } 
-            if (hitmarker) PlayWAVCP("staredit\\wav\\hitmarker.ogg", pro_owner[i]);
+            if (hitmarker) {
+                hitmarker = 0;
+                PlayWAVCP("staredit\\wav\\hitmarker.ogg", pro_owner[i]);
+                debug_values[7] = 100;
+            }
         }
     }
 }
@@ -923,22 +946,17 @@ function DamageEnemiesAtRect(playerID, posX, posY, rectSize, enemiesMax, doDamag
 }
 
 
-function GetEnemyUnitTotal() {
-    var c = 0;
-    foreach(unit : EUDLoopCUnit()) {
-        if (
-            unit.playerID == $P8 && (
-                unit.unitType == U_ZERGLING ||
-                unit.unitType == U_BROODLING ||
-                unit.unitType == U_ULTRALISK ||
-                unit.unitType == U_HYDRA ||
-                unit.unitType == U_INFESTED
-            )
-        ) {
-            c++;
-        }
-    }
-    return c;
+function GetEnemyMobTotal() {
+    var count = 0;
+    count += Cmn.GetCountOfUnit($P8, U_ZERGLING);
+    count += Cmn.GetCountOfUnit($P8, U_BROODLING);
+    count += Cmn.GetCountOfUnit($P8, U_ULTRALISK);
+    count += Cmn.GetCountOfUnit($P8, U_HYDRA);
+    count += Cmn.GetCountOfUnit($P8, U_INFESTED);
+    count += Cmn.GetCountOfUnit($P8, U_KERRI);
+    count += Cmn.GetCountOfUnit($P8, U_MUTA);
+    count += Cmn.GetCountOfUnit($P8, U_GUARDIAN);
+    return count;
 }
 
 
@@ -1581,8 +1599,10 @@ function afterTriggerExec() {
             const mouse_x, mouse_y = GetMousePosition(playerID);
             var is_moving = 0;
 
+            if (keypress_w[playerID] == 1) p_bow_action[playerID] = 1;
+            else if (keypress_w[playerID] == 2) p_bow_action[playerID] = 2;
             if (keypress_space[playerID] == 1) p_bow_action[playerID] = 1;
-            else if (keypress_space[playerID] == 2 && p_bow_action[playerID] == 1) p_bow_action[playerID] = 2;
+            else if (keypress_space[playerID] == 2) p_bow_action[playerID] = 2;
             if (p_bow_action[playerID] > 1) {
                 p_bow_action[playerID]++;
                 if (p_bow_action[playerID] >= 6) p_bow_action[playerID] = 0;
@@ -1637,7 +1657,7 @@ function afterTriggerExec() {
                             DamageEnemiesAtRect(playerID, dpos_x, dpos_y, sword_width, 5, GetSwordDamage(playerID));
                             setloc(L_MAIN, dpos_x, dpos_y);
                             var distance = sword_width;
-                            if (distance > 64) distance = 64;
+                            if (distance > 32) distance = 32;
                             dpos_x, dpos_y = Cmn.MovePosTowards(dpos_x, dpos_y, p_sword_angle[playerID], distance);
                             if (sword_length > 1) {
                                 Cmn.CreateImageSpriteAtLocation($P8, L_MAIN, IMAGE_SCOURGE_ATTACK, DRAWF_HALLUC, ISCRIPT_FAST);
@@ -2019,8 +2039,12 @@ function afterTriggerExec() {
             if (music_timer == 0) PlayWAV("staredit\\wav\\wargate.ogg");
             
             // @bm Debug Values
-            if (debug_enabled) {
-                debug_values[0] = p_aggro_timer[playerID];
+            if (debug_enabled || (show_debug_values_p1 && playerID == $P1)) {
+                debug_values[0] = GetEnemyMobTotal();
+                if (debug_values[7] >= 100) {
+                    debug_values[7]++;
+                    if (debug_values[7] >= 124) debug_values[7] = 0;
+                }
                 eprintf("{} | {} | {} | {} | {} | {} | {} | {}", debug_values[0], debug_values[1], debug_values[2], debug_values[3], debug_values[4], debug_values[5], debug_values[6], debug_values[7]);
             }
 
@@ -2050,9 +2074,9 @@ function afterTriggerExec() {
                             setloc(L_MAIN, unit.posX + new_x, unit.posY + new_y);
                         }
                         setloc(L_0X0, unit.posX, unit.posY);
-                        unit.unitID = 0;
+                        unit.unitType = 0;
                         Order(0, $P7, L_0X0, Move, L_MAIN);
-                        unit.unitID = U_REVIVAL_ORB;
+                        unit.unitType = U_REVIVAL_ORB;
                     }
                 }
             }
@@ -2100,7 +2124,7 @@ function afterTriggerExec() {
     if (scan_chunk_current > 255) scan_chunk_current = 0;
 
     // @bm MAIN SPAWN
-    if (main_spawn_timer > 0) main_spawn_timer -= 1;
+    if (main_spawn_timer > 0) main_spawn_timer--;
     if (main_spawn_timer == 0) {
         main_spawn_timer = 1440;
         for (var chunk_x = 0; chunk_x < 16; chunk_x++) {
@@ -2111,6 +2135,8 @@ function afterTriggerExec() {
             SpawnMonstersAtChunk(0, chunk_y);
             SpawnMonstersAtChunk(15, chunk_y);
         }
+    } else if (GetEnemyMobTotal() <= 10) {
+        main_spawn_timer = 0;
     }
 
     // Snow

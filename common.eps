@@ -197,16 +197,11 @@ function FlagIsSet(flags, id) {
 }
 
 
-function GetCountOfUnit(playerID, unitID) {
-    var c = 0;
-    foreach(unit : EUDLoopCUnit()) {
-        if (unit.playerID == playerID && unit.unitType == unitID) {
-            c++;
-        }
-    }
-    return c;
-}
-
 function GetUnitTotal() {
     return dwread(0x6283F0);
+}
+
+
+function GetCountOfUnit(playerID, unitType) {
+    return dwread_epd(EPD(0x582324) + 12 * unitType + playerID);
 }
