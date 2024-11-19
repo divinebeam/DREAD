@@ -17,6 +17,7 @@ const L_5X5 = $L("5x5");
 const L_10X10 = $L("16x16");
 const L_16X16 = $L("16x16");
 const L_MOUSE = [4, 5, 6, 7, 8, 9];
+const L_UTILITY = [19, 20, 21, 22, 23, 24];
 
 /*
     @bm cunit data
@@ -253,6 +254,9 @@ function UpdateReviveCost(playerID) {
         p_agility_cost[playerID] >= p_resilience_cost[playerID]
     ) p_revive_cost[playerID] = p_agility_cost[playerID];
 }
+const p_stat_kills = PVariable();
+var p_camera_follow = 0;
+
 const text_show_line = EUDArray(12);
 const text_line = [Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512)];
 const text_line_right = [Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512), Db(512)];
@@ -268,13 +272,13 @@ const keypress_7 = PVariable();
 const keypress_8 = PVariable();
 const keypress_9 = PVariable();
 const keypress_0 = PVariable();
-const keypress_f = PVariable();
-const keypress_g = PVariable();
 const keypress_q = PVariable();
 const keypress_w = PVariable();
 const keypress_e = PVariable();
 const keypress_r = PVariable();
 const keypress_d = PVariable();
+const keypress_shift = PVariable();
+const keypress_space = PVariable();
 EUDRegisterObjectToNamespace("key_1", keypress_1);
 EUDRegisterObjectToNamespace("key_2", keypress_2);
 EUDRegisterObjectToNamespace("key_3", keypress_3);
@@ -285,13 +289,13 @@ EUDRegisterObjectToNamespace("key_7", keypress_7);
 EUDRegisterObjectToNamespace("key_8", keypress_8);
 EUDRegisterObjectToNamespace("key_9", keypress_9);
 EUDRegisterObjectToNamespace("key_0", keypress_0);
-EUDRegisterObjectToNamespace("key_f", keypress_f);
-EUDRegisterObjectToNamespace("key_g", keypress_g);
 EUDRegisterObjectToNamespace("key_q", keypress_q);
 EUDRegisterObjectToNamespace("key_w", keypress_w);
 EUDRegisterObjectToNamespace("key_e", keypress_e);
 EUDRegisterObjectToNamespace("key_r", keypress_r);
 EUDRegisterObjectToNamespace("key_d", keypress_d);
+EUDRegisterObjectToNamespace("key_shift", keypress_shift);
+EUDRegisterObjectToNamespace("key_space", keypress_space);
 
 
 // @bm Functions
@@ -307,6 +311,7 @@ function SetActionText(text) {
         text_action_timer = 72;
     }
 }
+
 
 function HeroIsAlive(playerID) {
     if (Command(playerID, AtLeast, 1, U_HERO[playerID])) return 1;
@@ -336,15 +341,20 @@ function CreateCUnit(unitType, location, playerID) : CUnit {
 
 
 function UnitIsDamageable(unitType) {
-    switch(unitType) {
-        case 0: return 0;
-        case U_MONSTER_NEST: return 1;
-        case U_ZERGLING: return 1;
-        case U_BROODLING: return 1;
-        case U_ULTRALISK: return 1;
-        case U_HYDRA: return 1;
-        case U_INFESTED: return 1;
+    if (
+        unitType == U_MONSTER_NEST ||
+        unitType == U_ZERGLING ||
+        unitType == U_BROODLING ||
+        unitType == U_ULTRALISK ||
+        unitType == U_HYDRA ||
+        unitType == U_INFESTED ||
+        unitType == U_KERRI ||
+        unitType == U_MUTA ||
+        unitType == U_GUARDIAN
+    ) {
+        return 1;
     }
+    return 0;
 }
 
 
@@ -355,11 +365,10 @@ function reset_found_units() {
 function GetEnemiesAtRect(playerID, left, right, top, bottom, enemiesMax) {
     var found_count = 0;
     if (playerID < 6) {
-        foreach(unit : EUDLoopCUnit()) {
+        foreach(unit: EUDLoopCUnit()) {
             if (found_count >= enemiesMax) break;
             if (
-                unit.playerID == $P8 && 
-                UnitIsDamageable(unit.unitType) &&
+                unit.playerID == $P8 &&
                 unit.posX >= left &&
                 unit.posX <= right &&
                 unit.posY >= top &&
@@ -1556,11 +1565,22 @@ function afterTriggerExec() {
             const mouse_x, mouse_y = GetMousePosition(playerID);
             var is_moving = 0;
 
-            if (keypress_w[playerID] == 1) p_bow_action[playerID] = 1;
-            else if (keypress_w[playerID] == 2 && p_bow_action[playerID] == 1) p_bow_action[playerID] = 2;
+            if (keypress_space[playerID] == 1) p_bow_action[playerID] = 1;
+            else if (keypress_space[playerID] == 2 && p_bow_action[playerID] == 1) p_bow_action[playerID] = 2;
             if (p_bow_action[playerID] > 1) {
                 p_bow_action[playerID]++;
                 if (p_bow_action[playerID] >= 6) p_bow_action[playerID] = 0;
+            }
+
+            // camera follow toggle
+            if (keypress_shift[playerID] && IsUserCP()) {
+                if (p_camera_follow == 0) {
+                    p_camera_follow = 1;
+                    SetActionText(Db("Camera Follow ON."));
+                } else if (p_camera_follow == 1) {
+                    p_camera_follow = 0;
+                    SetActionText(Db("Camera Follow OFF."));
+                }
             }
 
             if (HeroIsAlive(playerID)) {
@@ -1695,8 +1715,10 @@ function afterTriggerExec() {
                 }
                 if (p_dash_state[playerID] > 1) {
                     const col_posx, col_posy = Cmn.MovePosTowards(p_dash_x[playerID], p_dash_y[playerID], p_dash_angle[playerID], 24);
-                    if (PosHasTerrainCollider(col_posx, col_posy)) {
-
+                    // cancel dash
+                    if (keypress_d[playerID] && p_dash_state[playerID] >= 6) {
+                        p_dash_state[playerID] = p_dash_max_distance[playerID];
+                        SetActionText(Db("Canceled Dash."));
                     }
                     if (!PosHasTerrainCollider(col_posx, col_posy)) {
                         p_dash_x[playerID], p_dash_y[playerID] = col_posx, col_posy;
@@ -1728,6 +1750,11 @@ function afterTriggerExec() {
                     setloc(L_MAIN, p_dash_x[playerID], p_dash_y[playerID]);
                     Order(U_HERO[playerID], playerID, L_ANYWHERE, Move, L_MAIN);
                     p_dash_state[playerID] = 0;
+                }
+
+                if (p_camera_follow) {
+                    setloc(L_UTILITY[playerID], unit_hero_x, unit_hero_y);
+                    CenterView(L_UTILITY[playerID]);
                 }
             }
 
